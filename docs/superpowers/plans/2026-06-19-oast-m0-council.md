@@ -2,21 +2,23 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the M0 "Council" — a Laravel review engine that fans out an OpenAPI spec to 3 hardcoded LLM panelists, has a dedicated judge organize their critiques into validated, structured findings, and exposes it via one HTTP endpoint and one artisan command, with a single-model baseline mode for comparison.
+**Goal:** Build the M0 "Council" — a Laravel review engine that fans out an OpenAPI spec to 3 LLM panelists via the Laravel AI SDK, has a dedicated judge organize their critiques into structured, validated findings, and exposes it via one HTTP endpoint (on an `api.*` subdomain) and one artisan command, with a single-model baseline mode for comparison.
 
-**Architecture:** One stateless engine (`CouncilOrchestrator`) is a pure-ish function `(spec, request) → ReviewResult` that performs no DB writes. Two thin entry points — `POST /v1/reviews` (the M0 deliverable) and `oast:review` (the experiment driver) — call the engine and own persistence to a `reviews` table. All model traffic goes through OpenRouter (BYOK).
+**Architecture:** One stateless engine (`CouncilOrchestrator`) is a pure-ish function `(spec, request) → ReviewResult` that performs no DB writes. Panelists and the judge are **Laravel AI SDK agents** (`PanelistAgent`, `JudgeAgent`), reaching models through OpenRouter (the SDK's built-in `openrouter` provider, single-key BYOK). Two thin entry points — an invokable Action behind `POST https://api.<domain>/v1/reviews` (ADR pattern) and the `oast:review` command — call the engine and own persistence to a `reviews` table.
 
-**Tech Stack:** PHP 8.3, Laravel 13, Pest 4, Laravel HTTP client (`Http::pool`), SQLite, OpenRouter API.
+**Tech Stack:** PHP 8.5, Laravel 13, Laravel AI SDK (`laravel/ai`), Pest 4, SQLite, OpenRouter (via the SDK).
 
 ## Global Constraints
 
-- PHP `^8.3`, Laravel `^13.8`, Pest `^4.7` — do not add other major deps for M0.
-- Tests run against in-memory SQLite (`phpunit.xml`); `RefreshDatabase` is auto-applied to the `Feature` suite via `tests/Pest.php`.
-- BYOK: OpenRouter key read from `OPENROUTER_API_KEY` env via `config/oast.php`. No auth layer on the endpoint in M0.
+- PHP `^8.5`, Laravel `^13.8`, Pest `^4.7`. Add exactly one runtime dependency: `laravel/ai`.
+- **Models reach OpenRouter via the Laravel AI SDK's built-in `openrouter` provider** (`Lab::OpenRouter`), single key `OPENROUTER_API_KEY`. Panelist/judge model slugs come from `config/oast.php` and are passed as per-prompt `model:` overrides. (Native multi-provider is an M1 option.)
+- Tests run against in-memory SQLite (`phpunit.xml`); `RefreshDatabase` is auto-applied to `Feature` via `tests/Pest.php`. The `Unit` suite is bound to `Tests\TestCase` (Task 1) so SDK facades/helpers work there too.
+- **All LLM tests use the SDK's native fakes** (`PanelistAgent::fake()`, `JudgeAgent::fake()`) — no live calls in the default suite. Live tests are tagged `->group('live')` and excluded from `composer test`.
 - M0 dimension is fixed: `domain-modeling` (Dimension 1).
-- Quorum floor: **2** successful panelists. Per-call retry count: **1**.
-- Format with `vendor/bin/pint` (default Laravel preset) before each commit.
-- All LLM-orchestration tests use `Http::fake()` — no live calls in the default suite. Live tests are tagged `->group('live')` and excluded from `composer test`.
+- Quorum floor: **2** successful panelists. Per-call retry: **1**. Panel calls run **sequentially** in M0 (concurrency is an M1 SSE-era concern).
+- **Code style: PER preset via a committed `pint.json`** (Pint is already installed). Format with `vendor/bin/pint` before each commit.
+- The API is served on the `api.*` subdomain (`config('oast.api_domain')`), not an `/api/` path prefix.
+- Entry points use the **ADR pattern**: invokable single-action controllers in `app/Actions`, output shaped by an API Resource (the "Responder").
 - Finding schema (the validated judge output contract):
 
   ```jsonc
@@ -33,96 +35,97 @@
   }
   ```
 
+> **Two SDK details to confirm against the installed `laravel/ai` version (flagged, not blocking):**
+> 1. **Per-call usage/cost accessor.** The SDK exposes `$response->text` and array access for structured output; a per-response token/cost accessor isn't documented for non-streaming prompts. **M0 metrics record measured latency (`ms`) only**; wiring per-model token/cost (likely via `$response->usage` or the SDK's invocation logging) is a fast follow-up once the accessor is confirmed.
+> 2. **Faking structured output with explicit data.** This plan assumes `JudgeAgent::fake([['findings' => [...]]])` supplies an explicit structured response (and `JudgeAgent::fake()` auto-generates schema-matching data). If the installed version only supports string fakes for structured agents, adapt the judge tests accordingly.
+
 ---
 
-### Task 1: Config & value objects
+### Task 1: Project setup — deps, config, tooling
 
 **Files:**
+- Modify: `composer.json` (PHP `^8.5`, add `laravel/ai`)
+- Create: `config/ai.php` (published, then ensure `openrouter` provider)
 - Create: `config/oast.php`
-- Create: `app/Council/ReviewMode.php`
-- Create: `app/Council/ReviewRequest.php`
-- Create: `app/Council/PanelResponse.php`
-- Create: `app/Council/ReviewResult.php`
+- Create: `pint.json`
 - Modify: `tests/Pest.php` (bind `TestCase` to the `Unit` suite)
-- Test: `tests/Unit/Council/ValueObjectsTest.php`
+- Modify: `.env.example` (OpenRouter + API domain keys)
+- Test: `tests/Unit/SetupConfigTest.php`
 
 **Interfaces:**
 - Consumes: nothing.
 - Produces:
-  - `App\Council\ReviewMode` enum (string-backed): `ReviewMode::Council` (`'council'`), `ReviewMode::Baseline` (`'baseline'`).
-  - `App\Council\ReviewRequest` readonly: `new ReviewRequest(ReviewMode $mode, string $dimension = 'domain-modeling')`.
-  - `App\Council\PanelResponse` readonly with `string $model, bool $ok, ?string $content, int $ms, float $costUsd, ?string $error`; static `PanelResponse::ok(string $model, string $content, int $ms, float $costUsd): self` and `PanelResponse::failed(string $model, string $error): self`.
-  - `App\Council\ReviewResult` readonly with `ReviewMode $mode, string $dimension, array $panelModels, int $panelSize, array $rawPanelResponses, array $findings, array $metrics, string $status` and `toArray(): array` returning snake_case keys (`mode` as its string value).
-  - `config('oast')`: keys `base_url, api_key, timeout, panelists` (array of 3 model IDs), `judge` (string), `baseline` (?string), `quorum` (int).
+  - `config('ai.providers.openrouter')` → `['driver' => 'openrouter', 'key' => ..., 'url' => ...]`.
+  - `config('oast')` → keys `timeout` (int), `api_domain` (string), `panelists` (3 model-ID strings), `judge` (string), `baseline` (?string), `quorum` (int).
+  - `pint.json` with `"preset": "per"`.
+  - `Unit` suite runs with the Laravel application booted.
 
-- [ ] **Step 1a: Boot the framework in the Unit suite**
+- [ ] **Step 1: Install the SDK and bump PHP**
 
-The Council unit tests use Laravel facades/helpers (`Http::fake()`, `config()`, `resource_path()`, `Validator`), which need the application booted. By default `tests/Pest.php` only binds `TestCase` to `Feature`. Add a binding for `Unit` (no `RefreshDatabase` — unit tests touch no DB). In `tests/Pest.php`, after the existing `->in('Feature');` line, add:
+```bash
+# Set "php": "^8.5" in composer.json's require block first, then:
+composer require laravel/ai
+php artisan vendor:publish --tag=ai-config   # writes config/ai.php
+```
+
+Edit `composer.json` `require` so it reads:
+
+```json
+"require": {
+    "php": "^8.5",
+    "laravel/ai": "^0.1",
+    "laravel/framework": "^13.8",
+    "laravel/tinker": "^3.0"
+},
+```
+
+(Use whatever stable `laravel/ai` constraint `composer require` resolves; the line above is the shape.)
+
+- [ ] **Step 2: Write the failing test**
+
+```php
+<?php
+
+use Illuminate\Support\Facades\File;
+
+it('configures the openrouter provider for the AI SDK', function () {
+    expect(config('ai.providers.openrouter.driver'))->toBe('openrouter');
+});
+
+it('exposes oast config defaults', function () {
+    expect(config('oast.quorum'))->toBe(2)
+        ->and(config('oast.panelists'))->toBeArray()->toHaveCount(3)
+        ->and(config('oast.api_domain'))->toBeString();
+});
+
+it('uses the PER pint preset', function () {
+    $pint = json_decode(File::get(base_path('pint.json')), true);
+    expect($pint['preset'])->toBe('per');
+});
+```
+
+- [ ] **Step 3: Run test to verify it fails**
+
+Run: `vendor/bin/pest tests/Unit/SetupConfigTest.php`
+Expected: FAIL — `config('oast...')` null / `pint.json` missing. (If the `Unit` suite errors because the app isn't booted, that confirms Step 4 is required.)
+
+- [ ] **Step 4: Write minimal implementation**
+
+In `tests/Pest.php`, after the existing `->in('Feature');` line, add:
 
 ```php
 pest()->extend(Tests\TestCase::class)->in('Unit');
 ```
 
-- [ ] **Step 1: Write the failing test**
+Ensure `config/ai.php` contains the `openrouter` provider (add it if `vendor:publish` didn't):
 
 ```php
-<?php
-
-use App\Council\PanelResponse;
-use App\Council\ReviewMode;
-use App\Council\ReviewResult;
-
-it('builds review mode from string', function () {
-    expect(ReviewMode::from('council'))->toBe(ReviewMode::Council)
-        ->and(ReviewMode::from('baseline'))->toBe(ReviewMode::Baseline);
-});
-
-it('constructs ok and failed panel responses', function () {
-    $ok = PanelResponse::ok('openai/gpt', 'critique text', 1200, 0.012);
-    expect($ok->ok)->toBeTrue()
-        ->and($ok->content)->toBe('critique text')
-        ->and($ok->ms)->toBe(1200)
-        ->and($ok->costUsd)->toBe(0.012);
-
-    $failed = PanelResponse::failed('google/gemini', 'HTTP 500');
-    expect($failed->ok)->toBeFalse()
-        ->and($failed->content)->toBeNull()
-        ->and($failed->error)->toBe('HTTP 500');
-});
-
-it('serializes a review result to a snake_case array', function () {
-    $result = new ReviewResult(
-        mode: ReviewMode::Council,
-        dimension: 'domain-modeling',
-        panelModels: ['a', 'b'],
-        panelSize: 2,
-        rawPanelResponses: [['model' => 'a', 'ok' => true, 'content' => 'x', 'error' => null]],
-        findings: [['title' => 'f']],
-        metrics: [['model' => 'a', 'ms' => 10, 'costUsd' => 0.1]],
-        status: 'complete',
-    );
-
-    expect($result->toArray())->toMatchArray([
-        'mode' => 'council',
-        'dimension' => 'domain-modeling',
-        'panel_models' => ['a', 'b'],
-        'panel_size' => 2,
-        'status' => 'complete',
-    ]);
-});
-
-it('exposes oast config defaults', function () {
-    expect(config('oast.quorum'))->toBe(2)
-        ->and(config('oast.panelists'))->toBeArray()->toHaveCount(3);
-});
+'openrouter' => [
+    'driver' => 'openrouter',
+    'key' => env('OPENROUTER_API_KEY'),
+    'url' => env('OPENROUTER_URL'),
+],
 ```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `vendor/bin/pest tests/Unit/Council/ValueObjectsTest.php`
-Expected: FAIL — `Class "App\Council\ReviewMode" not found`.
-
-- [ ] **Step 3: Write minimal implementation**
 
 `config/oast.php`:
 
@@ -130,11 +133,12 @@ Expected: FAIL — `Class "App\Council\ReviewMode" not found`.
 <?php
 
 return [
-    'base_url' => env('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'),
-    'api_key' => env('OPENROUTER_API_KEY'),
     'timeout' => (int) env('OAST_TIMEOUT', 120),
 
-    // Hardcoded for M0; becomes config-driven roster in M1.
+    // The api.* subdomain the REST API is served on.
+    'api_domain' => env('OAST_API_DOMAIN', 'api.oast.test'),
+
+    // Panelist model slugs (OpenRouter). Hardcoded for M0; config-driven roster in M1.
     // Confirm exact OpenRouter slugs before the first live run.
     'panelists' => [
         'anthropic/claude-sonnet-4',
@@ -151,6 +155,109 @@ return [
     'quorum' => 2,
 ];
 ```
+
+`pint.json`:
+
+```json
+{
+    "preset": "per"
+}
+```
+
+Append to `.env.example`:
+
+```
+OPENROUTER_API_KEY=
+OPENROUTER_URL=
+OAST_API_DOMAIN=api.oast.test
+```
+
+- [ ] **Step 5: Run test to verify it passes**
+
+Run: `vendor/bin/pest tests/Unit/SetupConfigTest.php`
+Expected: PASS (3 passed).
+
+- [ ] **Step 6: Reformat to PER and commit**
+
+```bash
+vendor/bin/pint
+git add composer.json composer.lock config/ai.php config/oast.php pint.json tests/Pest.php .env.example tests/Unit/SetupConfigTest.php
+git commit -m "chore: install Laravel AI SDK, add oast config, adopt PER pint preset"
+```
+
+---
+
+### Task 2: Value objects
+
+**Files:**
+- Create: `app/Council/ReviewMode.php`
+- Create: `app/Council/ReviewRequest.php`
+- Create: `app/Council/PanelResponse.php`
+- Create: `app/Council/ReviewResult.php`
+- Test: `tests/Unit/Council/ValueObjectsTest.php`
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces:
+  - `App\Council\ReviewMode` enum (string-backed): `ReviewMode::Council` (`'council'`), `ReviewMode::Baseline` (`'baseline'`).
+  - `App\Council\ReviewRequest` readonly: `new ReviewRequest(ReviewMode $mode, string $dimension = 'domain-modeling')`.
+  - `App\Council\PanelResponse` readonly: `string $model, bool $ok, ?string $content, int $ms, ?string $error`; statics `PanelResponse::ok(string $model, string $content, int $ms): self` and `PanelResponse::failed(string $model, string $error): self`.
+  - `App\Council\ReviewResult` readonly: `ReviewMode $mode, string $dimension, array $panelModels, int $panelSize, array $rawPanelResponses, array $findings, array $metrics, string $status`; `toArray(): array` (snake_case keys, `mode` as its value).
+
+- [ ] **Step 1: Write the failing test**
+
+```php
+<?php
+
+use App\Council\PanelResponse;
+use App\Council\ReviewMode;
+use App\Council\ReviewResult;
+
+it('builds review mode from string', function () {
+    expect(ReviewMode::from('council'))->toBe(ReviewMode::Council)
+        ->and(ReviewMode::from('baseline'))->toBe(ReviewMode::Baseline);
+});
+
+it('constructs ok and failed panel responses', function () {
+    $ok = PanelResponse::ok('openai/gpt', 'critique text', 1200);
+    expect($ok->ok)->toBeTrue()
+        ->and($ok->content)->toBe('critique text')
+        ->and($ok->ms)->toBe(1200);
+
+    $failed = PanelResponse::failed('google/gemini', 'timeout');
+    expect($failed->ok)->toBeFalse()
+        ->and($failed->content)->toBeNull()
+        ->and($failed->error)->toBe('timeout');
+});
+
+it('serializes a review result to a snake_case array', function () {
+    $result = new ReviewResult(
+        mode: ReviewMode::Council,
+        dimension: 'domain-modeling',
+        panelModels: ['a', 'b'],
+        panelSize: 2,
+        rawPanelResponses: [['model' => 'a', 'ok' => true, 'content' => 'x', 'error' => null]],
+        findings: [['title' => 'f']],
+        metrics: [['model' => 'a', 'ms' => 10]],
+        status: 'complete',
+    );
+
+    expect($result->toArray())->toMatchArray([
+        'mode' => 'council',
+        'dimension' => 'domain-modeling',
+        'panel_models' => ['a', 'b'],
+        'panel_size' => 2,
+        'status' => 'complete',
+    ]);
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `vendor/bin/pest tests/Unit/Council/ValueObjectsTest.php`
+Expected: FAIL — `Class "App\Council\ReviewMode" not found`.
+
+- [ ] **Step 3: Write minimal implementation**
 
 `app/Council/ReviewMode.php`:
 
@@ -196,18 +303,17 @@ final readonly class PanelResponse
         public bool $ok,
         public ?string $content,
         public int $ms,
-        public float $costUsd,
         public ?string $error = null,
     ) {}
 
-    public static function ok(string $model, string $content, int $ms, float $costUsd): self
+    public static function ok(string $model, string $content, int $ms): self
     {
-        return new self($model, true, $content, $ms, $costUsd);
+        return new self($model, true, $content, $ms);
     }
 
     public static function failed(string $model, string $error): self
     {
-        return new self($model, false, null, 0, 0.0, $error);
+        return new self($model, false, null, 0, $error);
     }
 }
 ```
@@ -251,274 +357,14 @@ final readonly class ReviewResult
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `vendor/bin/pest tests/Unit/Council/ValueObjectsTest.php`
-Expected: PASS (4 passed).
+Expected: PASS (3 passed).
 
 - [ ] **Step 5: Format and commit**
 
 ```bash
-vendor/bin/pint app/Council config/oast.php
-git add app/Council config/oast.php tests/Unit/Council/ValueObjectsTest.php
-git commit -m "feat: add M0 council config and value objects"
-```
-
----
-
-### Task 2: OpenRouter client
-
-**Files:**
-- Create: `app/Council/OpenRouter/OpenRouterClient.php`
-- Create: `app/Council/Exceptions/OpenRouterException.php`
-- Modify: `app/Providers/AppServiceProvider.php`
-- Modify: `.env.example` (append `OPENROUTER_API_KEY=`)
-- Test: `tests/Unit/Council/OpenRouterClientTest.php`
-
-**Interfaces:**
-- Consumes: `config('oast')`.
-- Produces:
-  - `App\Council\OpenRouter\OpenRouterClient` constructed as `new OpenRouterClient(string $baseUrl, ?string $apiKey, int $timeout)`.
-  - `request(string $model, array $messages, ?array $responseFormat = null): array` → `['content' => string, 'costUsd' => float, 'ms' => int]`; throws `OpenRouterException` on HTTP/transport failure.
-  - `pool(array $calls): array` where `$calls` is keyed by model ID, each `['messages' => array, 'responseFormat' => ?array]`. Returns array keyed by model: `['ok' => bool, 'content' => ?string, 'costUsd' => float, 'ms' => int, 'error' => ?string]`. Never throws per-call — captures failures.
-  - `App\Council\Exceptions\OpenRouterException extends \RuntimeException`.
-
-- [ ] **Step 1: Write the failing test**
-
-```php
-<?php
-
-use App\Council\Exceptions\OpenRouterException;
-use App\Council\OpenRouter\OpenRouterClient;
-use Illuminate\Support\Facades\Http;
-
-function fakeChat(string $content, float $cost = 0.01): array
-{
-    return [
-        'choices' => [['message' => ['content' => $content]]],
-        'usage' => ['cost' => $cost],
-    ];
-}
-
-function client(): OpenRouterClient
-{
-    return new OpenRouterClient('https://openrouter.ai/api/v1', 'test-key', 30);
-}
-
-it('sends a single chat request and returns content and cost', function () {
-    Http::fake(['*/chat/completions' => Http::response(fakeChat('hello', 0.02))]);
-
-    $result = client()->request('openai/gpt', [['role' => 'user', 'content' => 'hi']]);
-
-    expect($result['content'])->toBe('hello')
-        ->and($result['costUsd'])->toBe(0.02)
-        ->and($result['ms'])->toBeInt();
-
-    Http::assertSent(fn ($req) => $req['model'] === 'openai/gpt'
-        && $req->hasHeader('Authorization', 'Bearer test-key'));
-});
-
-it('throws OpenRouterException on http failure for single request', function () {
-    Http::fake(['*/chat/completions' => Http::response('boom', 500)]);
-
-    client()->request('openai/gpt', [['role' => 'user', 'content' => 'hi']]);
-})->throws(OpenRouterException::class);
-
-it('passes response_format through when provided', function () {
-    Http::fake(['*/chat/completions' => Http::response(fakeChat('{}'))]);
-
-    client()->request('m', [['role' => 'user', 'content' => 'x']], ['type' => 'json_object']);
-
-    Http::assertSent(fn ($req) => data_get($req->data(), 'response_format.type') === 'json_object');
-});
-
-it('pools multiple models and keys results by model', function () {
-    Http::fake(function ($request) {
-        return Http::response(fakeChat('critique from '.$request['model']));
-    });
-
-    $results = client()->pool([
-        'a/one' => ['messages' => [['role' => 'user', 'content' => 'x']]],
-        'b/two' => ['messages' => [['role' => 'user', 'content' => 'x']]],
-    ]);
-
-    expect($results['a/one']['ok'])->toBeTrue()
-        ->and($results['a/one']['content'])->toBe('critique from a/one')
-        ->and($results['b/two']['ok'])->toBeTrue();
-});
-
-it('captures per-call failure in pool without throwing', function () {
-    Http::fake(function ($request) {
-        return $request['model'] === 'bad/model'
-            ? Http::response('err', 500)
-            : Http::response(fakeChat('ok'));
-    });
-
-    $results = client()->pool([
-        'good/model' => ['messages' => [['role' => 'user', 'content' => 'x']]],
-        'bad/model' => ['messages' => [['role' => 'user', 'content' => 'x']]],
-    ]);
-
-    expect($results['good/model']['ok'])->toBeTrue()
-        ->and($results['bad/model']['ok'])->toBeFalse()
-        ->and($results['bad/model']['error'])->toContain('500');
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `vendor/bin/pest tests/Unit/Council/OpenRouterClientTest.php`
-Expected: FAIL — `Class "App\Council\OpenRouter\OpenRouterClient" not found`.
-
-- [ ] **Step 3: Write minimal implementation**
-
-`app/Council/Exceptions/OpenRouterException.php`:
-
-```php
-<?php
-
-namespace App\Council\Exceptions;
-
-use RuntimeException;
-
-class OpenRouterException extends RuntimeException {}
-```
-
-`app/Council/OpenRouter/OpenRouterClient.php`:
-
-```php
-<?php
-
-namespace App\Council\OpenRouter;
-
-use App\Council\Exceptions\OpenRouterException;
-use Illuminate\Http\Client\Pool;
-use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
-use Throwable;
-
-class OpenRouterClient
-{
-    public function __construct(
-        private string $baseUrl,
-        private ?string $apiKey,
-        private int $timeout,
-    ) {}
-
-    public function request(string $model, array $messages, ?array $responseFormat = null): array
-    {
-        try {
-            $response = Http::withToken((string) $this->apiKey)
-                ->timeout($this->timeout)
-                ->acceptJson()
-                ->post($this->baseUrl.'/chat/completions', $this->body($model, $messages, $responseFormat));
-        } catch (Throwable $e) {
-            throw new OpenRouterException("OpenRouter request to {$model} failed: {$e->getMessage()}", previous: $e);
-        }
-
-        if ($response->failed()) {
-            throw new OpenRouterException("OpenRouter request to {$model} failed: HTTP {$response->status()}");
-        }
-
-        $normalized = $this->normalize($model, $response);
-
-        return ['content' => $normalized['content'] ?? '', 'costUsd' => $normalized['costUsd'], 'ms' => $normalized['ms']];
-    }
-
-    public function pool(array $calls): array
-    {
-        $models = array_keys($calls);
-
-        $responses = Http::pool(function (Pool $pool) use ($calls) {
-            $requests = [];
-            foreach ($calls as $model => $call) {
-                $requests[] = $pool->as($model)
-                    ->withToken((string) $this->apiKey)
-                    ->timeout($this->timeout)
-                    ->acceptJson()
-                    ->post(
-                        $this->baseUrl.'/chat/completions',
-                        $this->body($model, $call['messages'], $call['responseFormat'] ?? null),
-                    );
-            }
-
-            return $requests;
-        });
-
-        $out = [];
-        foreach ($models as $model) {
-            $out[$model] = $this->normalize($model, $responses[$model]);
-        }
-
-        return $out;
-    }
-
-    private function body(string $model, array $messages, ?array $responseFormat): array
-    {
-        $body = [
-            'model' => $model,
-            'messages' => $messages,
-            'usage' => ['include' => true],
-        ];
-
-        if ($responseFormat !== null) {
-            $body['response_format'] = $responseFormat;
-        }
-
-        return $body;
-    }
-
-    private function normalize(string $model, Response|Throwable $response): array
-    {
-        if ($response instanceof Throwable) {
-            return ['ok' => false, 'content' => null, 'costUsd' => 0.0, 'ms' => 0, 'error' => $response->getMessage()];
-        }
-
-        if ($response->failed()) {
-            return ['ok' => false, 'content' => null, 'costUsd' => 0.0, 'ms' => 0, 'error' => "HTTP {$response->status()}"];
-        }
-
-        $json = $response->json();
-
-        return [
-            'ok' => true,
-            'content' => (string) data_get($json, 'choices.0.message.content', ''),
-            'costUsd' => (float) data_get($json, 'usage.cost', 0.0),
-            'ms' => (int) round(((float) ($response->handlerStats()['total_time'] ?? 0)) * 1000),
-            'error' => null,
-        ];
-    }
-}
-```
-
-Add binding in `app/Providers/AppServiceProvider.php` `register()` method body:
-
-```php
-$this->app->singleton(\App\Council\OpenRouter\OpenRouterClient::class, function ($app) {
-    $config = $app['config']->get('oast');
-
-    return new \App\Council\OpenRouter\OpenRouterClient(
-        $config['base_url'],
-        $config['api_key'],
-        $config['timeout'],
-    );
-});
-```
-
-Append to `.env.example`:
-
-```
-OPENROUTER_API_KEY=
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `vendor/bin/pest tests/Unit/Council/OpenRouterClientTest.php`
-Expected: PASS (5 passed).
-
-- [ ] **Step 5: Format and commit**
-
-```bash
-vendor/bin/pint app/Council app/Providers/AppServiceProvider.php
-git add app/Council app/Providers/AppServiceProvider.php .env.example tests/Unit/Council/OpenRouterClientTest.php
-git commit -m "feat: add OpenRouter client with pool and structured-output support"
+vendor/bin/pint app/Council
+git add app/Council tests/Unit/Council/ValueObjectsTest.php
+git commit -m "feat: add council value objects"
 ```
 
 ---
@@ -533,8 +379,8 @@ git commit -m "feat: add OpenRouter client with pool and structured-output suppo
 **Interfaces:**
 - Consumes: nothing.
 - Produces:
-  - `App\Council\FindingValidator` with `validate(array $findings): array` — returns the validated findings unchanged on success; throws `InvalidJudgeOutputException` on any violation.
-  - `App\Council\Exceptions\InvalidJudgeOutputException extends \RuntimeException` with public `array $errors` and constructor `__construct(array $errors)`.
+  - `App\Council\FindingValidator::validate(array $findings): array` — returns the findings on success; throws on any violation. The SDK's structured output already enforces enums/required fields at the provider layer; this validator is defense-in-depth **and** owns the conditional rule (`disagreement` required when `confidence = split`) that the schema marks optional.
+  - `App\Council\Exceptions\InvalidJudgeOutputException extends \RuntimeException` with public `array $errors`; `__construct(array $errors)`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -564,9 +410,7 @@ it('accepts a well-formed finding', function () {
 });
 
 it('requires disagreement when confidence is split', function () {
-    (new FindingValidator)->validate([
-        validFinding(['confidence' => 'split']),
-    ]);
+    (new FindingValidator)->validate([validFinding(['confidence' => 'split'])]);
 })->throws(InvalidJudgeOutputException::class);
 
 it('accepts a split finding that includes disagreement', function () {
@@ -584,7 +428,7 @@ it('rejects a finding missing location', function () {
     (new FindingValidator)->validate([$finding]);
 })->throws(InvalidJudgeOutputException::class);
 
-it('rejects a non-list / empty payload', function () {
+it('rejects an empty payload', function () {
     (new FindingValidator)->validate([]);
 })->throws(InvalidJudgeOutputException::class);
 
@@ -686,57 +530,64 @@ git commit -m "feat: add finding schema validator"
 
 ---
 
-### Task 4: Prompt builders
+### Task 4: Agents & prompts
 
 **Files:**
 - Create: `resources/prompts/panel.md`
 - Create: `resources/prompts/judge.md`
+- Create: `app/Ai/Agents/PanelistAgent.php`
+- Create: `app/Ai/Agents/JudgeAgent.php`
 - Create: `app/Council/Prompts/PanelPrompt.php`
 - Create: `app/Council/Prompts/JudgePrompt.php`
-- Test: `tests/Unit/Council/PromptTest.php`
+- Test: `tests/Unit/Council/AgentTest.php`
 
 **Interfaces:**
-- Consumes: nothing.
+- Consumes: Laravel AI SDK (`Agent`, `HasStructuredOutput`, `Promptable`, `JsonSchema`).
 - Produces:
-  - `App\Council\Prompts\PanelPrompt::build(string $spec): array` — returns OpenAI-style messages `[['role' => 'system', 'content' => ...], ['role' => 'user', 'content' => ...]]`. The user message embeds the raw spec. **No rubric** is included (keeps panel disagreement genuine).
-  - `App\Council\Prompts\JudgePrompt::build(string $spec, array $panelCritiques): array` — `$panelCritiques` is a list of `['model' => string, 'content' => string]`. Returns messages whose system content includes the Dimension 1 rubric and a strict instruction to return JSON `{"findings": [...]}`.
+  - `App\Ai\Agents\PanelistAgent` — `instructions()` returns `resources/prompts/panel.md` (the critique system prompt; **no rubric**). Prompted with the spec user-text and a per-prompt `model:` override.
+  - `App\Ai\Agents\JudgeAgent implements Agent, HasStructuredOutput` — `instructions()` returns `resources/prompts/judge.md`; `schema(JsonSchema $schema)` defines `{ findings: [ <finding object> ] }`. Structured response read via `$response['findings']`.
+  - `App\Council\Prompts\PanelPrompt::userPrompt(string $spec): string`.
+  - `App\Council\Prompts\JudgePrompt::userPrompt(string $spec, array $panelCritiques): string` where each critique is `['model' => string, 'content' => string]`.
 
 - [ ] **Step 1: Write the failing test**
 
 ```php
 <?php
 
+use App\Ai\Agents\JudgeAgent;
+use App\Ai\Agents\PanelistAgent;
 use App\Council\Prompts\JudgePrompt;
 use App\Council\Prompts\PanelPrompt;
 
-it('builds panel messages embedding the spec and no rubric', function () {
-    $messages = PanelPrompt::build("openapi: 3.1.0\ntitle: Demo");
-
-    expect($messages)->toBeArray()->and($messages[0]['role'])->toBe('system');
-    $joined = collect($messages)->pluck('content')->join("\n");
-    expect($joined)->toContain('openapi: 3.1.0')
-        ->and(strtolower($joined))->not->toContain('blocker'); // rubric severities not leaked to panel
+it('panelist instructions carry critique guidance but no rubric severities', function () {
+    $instructions = (new PanelistAgent)->instructions();
+    expect(strtolower($instructions))->toContain('domain')
+        ->and(strtolower($instructions))->not->toContain('blocker'); // rubric not leaked to panel
 });
 
-it('builds judge messages embedding spec, critiques, rubric, and json instruction', function () {
-    $messages = JudgePrompt::build('SPEC_BODY', [
-        ['model' => 'a/one', 'content' => 'critique one'],
-        ['model' => 'b/two', 'content' => 'critique two'],
-    ]);
+it('judge schema defines a findings array with the required keys', function () {
+    $schema = (new JudgeAgent)->schema(app(\Illuminate\Contracts\JsonSchema\JsonSchema::class));
+    expect($schema)->toHaveKey('findings');
+});
 
-    $joined = collect($messages)->pluck('content')->join("\n");
-    expect($joined)->toContain('SPEC_BODY')
-        ->and($joined)->toContain('critique one')
-        ->and($joined)->toContain('a/one')
-        ->and($joined)->toContain('domain-modeling')
-        ->and($joined)->toContain('findings'); // json instruction present
+it('builds a panel user prompt embedding the raw spec', function () {
+    expect(PanelPrompt::userPrompt("openapi: 3.1.0"))->toContain('openapi: 3.1.0');
+});
+
+it('builds a judge user prompt embedding spec and labeled critiques', function () {
+    $prompt = JudgePrompt::userPrompt('SPEC_BODY', [
+        ['model' => 'a/one', 'content' => 'critique one'],
+    ]);
+    expect($prompt)->toContain('SPEC_BODY')
+        ->and($prompt)->toContain('a/one')
+        ->and($prompt)->toContain('critique one');
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `vendor/bin/pest tests/Unit/Council/PromptTest.php`
-Expected: FAIL — `Class "App\Council\Prompts\PanelPrompt" not found`.
+Run: `vendor/bin/pest tests/Unit/Council/AgentTest.php`
+Expected: FAIL — `Class "App\Ai\Agents\PanelistAgent" not found`.
 
 - [ ] **Step 3: Write minimal implementation**
 
@@ -772,23 +623,75 @@ Severity:
 Confidence (from how many panelists independently raised it):
 - consensus: all/most panelists raised it.
 - majority: more panelists than not.
-- split: genuine disagreement — summarize each position in `disagreement`.
+- split: genuine disagreement — you MUST summarize each position in `disagreement`.
 - lone-flag: only one panelist raised it.
 
-Return ONLY a JSON object of the exact shape:
-{"findings": [{
-  "dimension": "domain-modeling",
-  "title": "...",
-  "severity": "blocker|should-fix|consider",
-  "confidence": "consensus|majority|split|lone-flag",
-  "location": "#/json/pointer/into/the/spec",
-  "finding": "...",
-  "why_it_matters": "...",
-  "disagreement": "... (include ONLY when confidence is split)",
-  "suggested_change": "..."
-}]}
+Each finding's `location` must be a JSON Pointer into the provided spec. Populate every
+required field. A split / blocker (two panelists say a boundary forces a v2, one disagrees)
+is the most valuable finding you can produce.
+```
 
-`location` must be a JSON Pointer into the provided spec. Output no prose outside the JSON.
+`app/Ai/Agents/PanelistAgent.php`:
+
+```php
+<?php
+
+namespace App\Ai\Agents;
+
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Promptable;
+
+class PanelistAgent implements Agent
+{
+    use Promptable;
+
+    public function instructions(): string
+    {
+        return file_get_contents(resource_path('prompts/panel.md'));
+    }
+}
+```
+
+`app/Ai/Agents/JudgeAgent.php`:
+
+```php
+<?php
+
+namespace App\Ai\Agents;
+
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Ai\Contracts\Agent;
+use Laravel\Ai\Contracts\HasStructuredOutput;
+use Laravel\Ai\Promptable;
+
+class JudgeAgent implements Agent, HasStructuredOutput
+{
+    use Promptable;
+
+    public function instructions(): string
+    {
+        return file_get_contents(resource_path('prompts/judge.md'));
+    }
+
+    public function schema(JsonSchema $schema): array
+    {
+        return [
+            'findings' => $schema->array()->items(
+                $schema->object(fn ($schema) => [
+                    'dimension' => $schema->string()->required(),
+                    'title' => $schema->string()->required(),
+                    'severity' => $schema->string()->enum(['blocker', 'should-fix', 'consider'])->required(),
+                    'confidence' => $schema->string()->enum(['consensus', 'majority', 'split', 'lone-flag'])->required(),
+                    'location' => $schema->string()->required(),
+                    'finding' => $schema->string()->required(),
+                    'why_it_matters' => $schema->string()->required(),
+                    'disagreement' => $schema->string(),
+                    'suggested_change' => $schema->string()->required(),
+                ])
+            )->required(),
+        ];
+    }
+}
 ```
 
 `app/Council/Prompts/PanelPrompt.php`:
@@ -800,14 +703,9 @@ namespace App\Council\Prompts;
 
 class PanelPrompt
 {
-    public static function build(string $spec): array
+    public static function userPrompt(string $spec): string
     {
-        $system = file_get_contents(resource_path('prompts/panel.md'));
-
-        return [
-            ['role' => 'system', 'content' => $system],
-            ['role' => 'user', 'content' => "Here is the OpenAPI specification to review:\n\n{$spec}"],
-        ];
+        return "Here is the OpenAPI specification to review:\n\n{$spec}";
     }
 }
 ```
@@ -821,95 +719,66 @@ namespace App\Council\Prompts;
 
 class JudgePrompt
 {
-    public static function build(string $spec, array $panelCritiques): array
+    public static function userPrompt(string $spec, array $panelCritiques): string
     {
-        $system = file_get_contents(resource_path('prompts/judge.md'));
-
         $critiques = collect($panelCritiques)
             ->map(fn (array $c) => "### Panelist: {$c['model']}\n{$c['content']}")
             ->join("\n\n");
 
-        $user = "## Specification under review\n\n{$spec}\n\n"
-            ."## Panel critiques\n\n{$critiques}";
-
-        return [
-            ['role' => 'system', 'content' => $system],
-            ['role' => 'user', 'content' => $user],
-        ];
+        return "## Specification under review\n\n{$spec}\n\n## Panel critiques\n\n{$critiques}";
     }
 }
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `vendor/bin/pest tests/Unit/Council/PromptTest.php`
-Expected: PASS (2 passed).
+Run: `vendor/bin/pest tests/Unit/Council/AgentTest.php`
+Expected: PASS (4 passed).
+
+> If `app(JsonSchema::class)` does not resolve a builder directly, construct it however the installed SDK exposes its schema builder; the assertion only checks that `schema()` returns a `findings` key.
 
 - [ ] **Step 5: Format and commit**
 
 ```bash
-vendor/bin/pint app/Council
-git add app/Council resources/prompts tests/Unit/Council/PromptTest.php
-git commit -m "feat: add panel and judge prompt builders"
+vendor/bin/pint app/Ai app/Council
+git add app/Ai app/Council resources/prompts tests/Unit/Council/AgentTest.php
+git commit -m "feat: add panelist and judge agents with prompts"
 ```
 
 ---
 
-### Task 5: Orchestrator — panel collection with retry & quorum
+### Task 5: Orchestrator — panel collection (sequential, retry, quorum)
 
 **Files:**
 - Create: `app/Council/CouncilOrchestrator.php`
 - Create: `app/Council/Exceptions/QuorumNotMetException.php`
+- Modify: `tests/Pest.php` (add the `orchestrator()` test helper)
 - Test: `tests/Unit/Council/CollectPanelTest.php`
 
 **Interfaces:**
-- Consumes: `OpenRouterClient`, `FindingValidator`, `config('oast')`.
+- Consumes: `PanelistAgent`, `FindingValidator`, `config('oast')`, `Lab::OpenRouter`.
 - Produces:
-  - `App\Council\CouncilOrchestrator` constructed as `new CouncilOrchestrator(OpenRouterClient $client, FindingValidator $validator, array $config)` where `$config` is the `oast` config array.
-  - `collectPanel(string $spec): array` — returns a list of `PanelResponse` (one per panelist, including failed ones after a single retry of failures).
-  - `App\Council\Exceptions\QuorumNotMetException extends \RuntimeException` with public `array $deadModels` and constructor `__construct(array $deadModels, int $succeeded, int $required)`.
+  - `App\Council\CouncilOrchestrator` — `new CouncilOrchestrator(FindingValidator $validator, array $config)`.
+  - `collectPanel(string $spec): array` — returns a list of `PanelResponse`, one per panelist, each retried once on failure, sequentially.
+  - `App\Council\Exceptions\QuorumNotMetException extends \RuntimeException` with public `array $deadModels`; `__construct(array $deadModels, int $succeeded, int $required)`.
 
-- [ ] **Step 1a: Add shared council test helpers to `tests/Pest.php`**
+- [ ] **Step 1a: Add the `orchestrator()` helper to `tests/Pest.php`**
 
-Append these helpers to `tests/Pest.php` (use fully-qualified names so no new `use` lines are needed). They are shared by Tasks 5, 6, and 7. `findingsJson()` is first used in Task 6 but lives here to keep all council helpers in one place.
+Append to `tests/Pest.php` (FQCN so no new `use` lines needed). Shared by Tasks 5, 6, 7.
 
 ```php
-function chatBody(string $content, float $cost = 0.01): array
-{
-    return ['choices' => [['message' => ['content' => $content]]], 'usage' => ['cost' => $cost]];
-}
-
 function orchestrator(array $configOverrides = []): \App\Council\CouncilOrchestrator
 {
     $config = array_merge([
-        'base_url' => 'https://openrouter.ai/api/v1',
-        'api_key' => 'test',
         'timeout' => 30,
+        'api_domain' => 'api.oast.test',
         'panelists' => ['a/one', 'b/two', 'c/three'],
         'judge' => 'judge/strong',
         'baseline' => null,
         'quorum' => 2,
     ], $configOverrides);
 
-    return new \App\Council\CouncilOrchestrator(
-        new \App\Council\OpenRouter\OpenRouterClient($config['base_url'], $config['api_key'], $config['timeout']),
-        new \App\Council\FindingValidator,
-        $config,
-    );
-}
-
-function findingsJson(): string
-{
-    return json_encode(['findings' => [[
-        'dimension' => 'domain-modeling',
-        'title' => 'Join table exposed',
-        'severity' => 'blocker',
-        'confidence' => 'consensus',
-        'location' => '#/paths/~1items',
-        'finding' => 'x',
-        'why_it_matters' => 'y',
-        'suggested_change' => 'z',
-    ]]]);
+    return new \App\Council\CouncilOrchestrator(new \App\Council\FindingValidator, $config);
 }
 ```
 
@@ -918,13 +787,13 @@ function findingsJson(): string
 ```php
 <?php
 
+use App\Ai\Agents\PanelistAgent;
 use App\Council\PanelResponse;
-use Illuminate\Support\Facades\Http;
 
-// orchestrator() and chatBody() come from tests/Pest.php (Step 1a).
+// orchestrator() comes from tests/Pest.php (Step 1a).
 
 it('collects all three panelists on the happy path', function () {
-    Http::fake(fn ($req) => Http::response(chatBody("critique {$req['model']}")));
+    PanelistAgent::fake(['critique one', 'critique two', 'critique three']);
 
     $responses = orchestrator()->collectPanel('SPEC');
 
@@ -933,34 +802,38 @@ it('collects all three panelists on the happy path', function () {
 });
 
 it('retries a failed panelist once and succeeds on retry', function () {
-    $calls = [];
-    Http::fake(function ($req) use (&$calls) {
-        $model = $req['model'];
-        $calls[$model] = ($calls[$model] ?? 0) + 1;
-        if ($model === 'b/two' && $calls[$model] === 1) {
-            return Http::response('err', 500); // fail first attempt only
+    $calls = 0;
+    PanelistAgent::fake(function () use (&$calls) {
+        $calls++;
+        if ($calls === 1) {
+            throw new RuntimeException('transient');
         }
 
-        return Http::response(chatBody("critique {$model}"));
+        return 'critique';
     });
 
-    $responses = collect(orchestrator()->collectPanel('SPEC'))->keyBy->model;
+    $responses = orchestrator()->collectPanel('SPEC');
 
-    expect($responses['b/two']->ok)->toBeTrue()
-        ->and($calls['b/two'])->toBe(2);
+    expect(collect($responses)->every(fn (PanelResponse $r) => $r->ok))->toBeTrue()
+        ->and($calls)->toBe(4); // 1 fail + 1 retry + 2 more panelists
 });
 
 it('marks a panelist failed when both attempts fail', function () {
-    Http::fake(function ($req) {
-        return $req['model'] === 'c/three'
-            ? Http::response('err', 500)
-            : Http::response(chatBody("critique {$req['model']}"));
+    $calls = 0;
+    PanelistAgent::fake(function () use (&$calls) {
+        $calls++;
+        // first panelist (calls 1 & 2) always fails; later panelists succeed
+        if ($calls <= 2) {
+            throw new RuntimeException('down');
+        }
+
+        return 'critique';
     });
 
-    $responses = collect(orchestrator()->collectPanel('SPEC'))->keyBy->model;
+    $responses = collect(orchestrator()->collectPanel('SPEC'));
 
-    expect($responses['c/three']->ok)->toBeFalse()
-        ->and($responses['a/one']->ok)->toBeTrue();
+    expect($responses->first()->ok)->toBeFalse()
+        ->and($responses->skip(1)->every(fn (PanelResponse $r) => $r->ok))->toBeTrue();
 });
 ```
 
@@ -1001,13 +874,14 @@ class QuorumNotMetException extends RuntimeException
 
 namespace App\Council;
 
-use App\Council\OpenRouter\OpenRouterClient;
+use App\Ai\Agents\PanelistAgent;
 use App\Council\Prompts\PanelPrompt;
+use Laravel\Ai\Enums\Lab;
+use Throwable;
 
 class CouncilOrchestrator
 {
     public function __construct(
-        private OpenRouterClient $client,
         private FindingValidator $validator,
         private array $config,
     ) {}
@@ -1015,30 +889,36 @@ class CouncilOrchestrator
     /** @return PanelResponse[] */
     public function collectPanel(string $spec): array
     {
-        $calls = [];
-        foreach ($this->config['panelists'] as $model) {
-            $calls[$model] = ['messages' => PanelPrompt::build($spec)];
-        }
+        $userPrompt = PanelPrompt::userPrompt($spec);
 
         $responses = [];
-        $retry = [];
-        foreach ($this->client->pool($calls) as $model => $result) {
-            if ($result['ok']) {
-                $responses[$model] = PanelResponse::ok($model, $result['content'], $result['ms'], $result['costUsd']);
-            } else {
-                $retry[$model] = $calls[$model];
-            }
+        foreach ($this->config['panelists'] as $model) {
+            $responses[] = $this->promptPanelist($userPrompt, $model)
+                ?? $this->promptPanelist($userPrompt, $model)            // retry once
+                ?? PanelResponse::failed($model, 'panel call failed after retry');
         }
 
-        if ($retry !== []) {
-            foreach ($this->client->pool($retry) as $model => $result) {
-                $responses[$model] = $result['ok']
-                    ? PanelResponse::ok($model, $result['content'], $result['ms'], $result['costUsd'])
-                    : PanelResponse::failed($model, $result['error'] ?? 'unknown error');
-            }
+        return $responses;
+    }
+
+    private function promptPanelist(string $userPrompt, string $model): ?PanelResponse
+    {
+        $start = microtime(true);
+
+        try {
+            $response = (new PanelistAgent)->prompt(
+                $userPrompt,
+                provider: Lab::OpenRouter,
+                model: $model,
+                timeout: $this->config['timeout'],
+            );
+        } catch (Throwable) {
+            return null;
         }
 
-        return array_values($responses);
+        $ms = (int) round((microtime(true) - $start) * 1000);
+
+        return PanelResponse::ok($model, $response->text, $ms);
     }
 }
 ```
@@ -1051,67 +931,63 @@ Expected: PASS (3 passed).
 - [ ] **Step 5: Format and commit**
 
 ```bash
-vendor/bin/pint app/Council
-git add app/Council tests/Unit/Council/CollectPanelTest.php
-git commit -m "feat: add panel collection with retry"
+vendor/bin/pint app/Council tests/Pest.php
+git add app/Council tests/Pest.php tests/Unit/Council/CollectPanelTest.php
+git commit -m "feat: add sequential panel collection with retry"
 ```
 
 ---
 
-### Task 6: Orchestrator — judge pass with structured output & retry
+### Task 6: Orchestrator — judge pass (structured output + retry)
 
 **Files:**
 - Modify: `app/Council/CouncilOrchestrator.php`
 - Test: `tests/Unit/Council/RunJudgeTest.php`
 
 **Interfaces:**
-- Consumes: `OpenRouterClient::request` with `responseFormat = ['type' => 'json_object']`, `FindingValidator`, `JudgePrompt`.
+- Consumes: `JudgeAgent` (structured output), `FindingValidator`, `JudgePrompt`, `config('oast.judge')`.
 - Produces:
-  - `CouncilOrchestrator::runJudge(string $spec, array $panelCritiques): array` where `$panelCritiques` is a list of `['model' => string, 'content' => string]`. Returns `['findings' => array, 'ms' => int, 'costUsd' => float]`. Re-prompts the judge once with the validation error if the first attempt fails validation; throws `InvalidJudgeOutputException` if the second attempt also fails.
-
-> **Structured-output note:** M0 uses OpenRouter's `response_format: {type: json_object}` (forces valid JSON, broadly supported) plus the `FindingValidator` and one re-prompt to enforce the *shape*. The design doc's stronger "native structured output" goal — a full `json_schema` response_format that forces the finding shape at the API layer — is a deliberate post-M0 hardening step (it depends on per-model `json_schema` support, an unnecessary variable for the experiment).
+  - `CouncilOrchestrator::runJudge(string $spec, array $panelCritiques): array` → `['findings' => array, 'ms' => int]`. Reads `$response['findings']`, validates, and on failure re-prompts the judge once with the validation error appended; throws `InvalidJudgeOutputException` if the second attempt also fails.
 
 - [ ] **Step 1: Write the failing test**
 
 ```php
 <?php
 
+use App\Ai\Agents\JudgeAgent;
 use App\Council\Exceptions\InvalidJudgeOutputException;
-use Illuminate\Support\Facades\Http;
 
-// orchestrator(), chatBody(), and findingsJson() come from tests/Pest.php (Task 5, Step 1a).
+// orchestrator() comes from tests/Pest.php (Task 5, Step 1a); validFinding() from FindingValidatorTest is
+// also globally available within the suite. If running this file in isolation, copy validFinding() locally.
 
 it('runs the judge and returns validated findings', function () {
-    Http::fake(fn ($req) => Http::response(chatBody(findingsJson(), 0.05)));
+    JudgeAgent::fake([['findings' => [validFinding()]]]);
 
     $result = orchestrator()->runJudge('SPEC', [['model' => 'a/one', 'content' => 'crit']]);
 
     expect($result['findings'])->toHaveCount(1)
         ->and($result['findings'][0]['severity'])->toBe('blocker')
-        ->and($result['costUsd'])->toBe(0.05);
+        ->and($result['ms'])->toBeInt();
 
-    Http::assertSent(fn ($req) => $req['model'] === 'judge/strong'
-        && data_get($req->data(), 'response_format.type') === 'json_object');
+    JudgeAgent::assertPrompted(fn ($prompt) => str_contains($prompt->prompt, 'crit'));
 });
 
 it('re-prompts once when the first judge output is invalid, then succeeds', function () {
-    $attempt = 0;
-    Http::fake(function () use (&$attempt) {
-        $attempt++;
-
-        return $attempt === 1
-            ? Http::response(chatBody('not json at all'))
-            : Http::response(chatBody(findingsJson()));
-    });
+    JudgeAgent::fake([
+        ['findings' => [validFinding(['confidence' => 'split'])]], // invalid: split w/o disagreement
+        ['findings' => [validFinding()]],                          // valid
+    ]);
 
     $result = orchestrator()->runJudge('SPEC', [['model' => 'a/one', 'content' => 'crit']]);
 
-    expect($result['findings'])->toHaveCount(1)
-        ->and($attempt)->toBe(2);
+    expect($result['findings'])->toHaveCount(1);
 });
 
 it('throws when the judge is invalid twice', function () {
-    Http::fake(fn () => Http::response(chatBody('still not json')));
+    JudgeAgent::fake([
+        ['findings' => [validFinding(['confidence' => 'split'])]],
+        ['findings' => [validFinding(['confidence' => 'split'])]],
+    ]);
 
     orchestrator()->runJudge('SPEC', [['model' => 'a/one', 'content' => 'crit']]);
 })->throws(InvalidJudgeOutputException::class);
@@ -1124,9 +1000,10 @@ Expected: FAIL — `Call to undefined method ...::runJudge()`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add `use` for the judge prompt and exception at the top of `app/Council/CouncilOrchestrator.php`:
+Add `use` lines to `app/Council/CouncilOrchestrator.php`:
 
 ```php
+use App\Ai\Agents\JudgeAgent;
 use App\Council\Exceptions\InvalidJudgeOutputException;
 use App\Council\Prompts\JudgePrompt;
 ```
@@ -1136,27 +1013,25 @@ Add this method to `CouncilOrchestrator`:
 ```php
 public function runJudge(string $spec, array $panelCritiques): array
 {
-    $messages = JudgePrompt::build($spec, $panelCritiques);
+    $base = JudgePrompt::userPrompt($spec, $panelCritiques);
     $lastErrors = [];
 
     for ($attempt = 0; $attempt < 2; $attempt++) {
-        $response = $this->client->request($this->config['judge'], $messages, ['type' => 'json_object']);
+        $prompt = $attempt === 0
+            ? $base
+            : $base."\n\nYour previous response was invalid: ".json_encode($lastErrors)
+                .". Return findings that satisfy every rule (a split finding MUST include `disagreement`).";
 
-        $decoded = json_decode($response['content'], true);
-        $findings = is_array($decoded) ? ($decoded['findings'] ?? null) : null;
+        $start = microtime(true);
+        $response = (new JudgeAgent)->prompt($prompt, provider: Lab::OpenRouter, model: $this->config['judge']);
+        $ms = (int) round((microtime(true) - $start) * 1000);
 
         try {
-            $validated = $this->validator->validate(is_array($findings) ? $findings : []);
+            $findings = $this->validator->validate($response['findings'] ?? []);
 
-            return ['findings' => $validated, 'ms' => $response['ms'], 'costUsd' => $response['costUsd']];
+            return ['findings' => $findings, 'ms' => $ms];
         } catch (InvalidJudgeOutputException $e) {
             $lastErrors = $e->errors;
-            $messages[] = [
-                'role' => 'user',
-                'content' => 'Your previous response was not valid. Errors: '
-                    .json_encode($e->errors)
-                    .'. Return ONLY the JSON object {"findings": [...]} matching the required schema.',
-            ];
         }
     }
 
@@ -1179,7 +1054,7 @@ git commit -m "feat: add judge pass with structured output and retry"
 
 ---
 
-### Task 7: Orchestrator — review() wiring (council + baseline) & container binding
+### Task 7: Orchestrator — review() wiring & container binding
 
 **Files:**
 - Modify: `app/Council/CouncilOrchestrator.php`
@@ -1189,31 +1064,26 @@ git commit -m "feat: add judge pass with structured output and retry"
 **Interfaces:**
 - Consumes: `collectPanel`, `runJudge`, `ReviewRequest`, `ReviewMode`, `config('oast')`.
 - Produces:
-  - `CouncilOrchestrator::review(string $spec, ReviewRequest $request): ReviewResult`.
-    - Council mode: `collectPanel`; filter ok responses; if fewer than `quorum` succeed, throw `QuorumNotMetException`; run judge on ok critiques.
-    - Baseline mode: single request to `config['baseline'] ?? config['panelists'][0]`; wrap as one ok `PanelResponse`; run judge on it.
-  - `ReviewResult.metrics` is a list of `['model' => string, 'ms' => int, 'costUsd' => float]` for every panel attempt plus one entry for the judge.
-  - `ReviewResult.rawPanelResponses` is a list of `['model' => string, 'ok' => bool, 'content' => ?string, 'error' => ?string]`.
-  - Container resolves `CouncilOrchestrator` with the live `oast` config.
+  - `CouncilOrchestrator::review(string $spec, ReviewRequest $request): ReviewResult`. Council mode: `collectPanel`; if fewer than `quorum` succeed, throw `QuorumNotMetException`; judge the successful critiques. Baseline mode: one panelist (`config['baseline'] ?? config['panelists'][0]`), retried once, then judge.
+  - `ReviewResult.metrics` = list of `['model' => string, 'ms' => int]` (one per panel attempt + one for the judge).
+  - `ReviewResult.rawPanelResponses` = list of `['model' => string, 'ok' => bool, 'content' => ?string, 'error' => ?string]`.
+  - Container resolves `CouncilOrchestrator` with live `oast` config.
 
 - [ ] **Step 1: Write the failing test**
 
 ```php
 <?php
 
+use App\Ai\Agents\JudgeAgent;
+use App\Ai\Agents\PanelistAgent;
+use App\Council\CouncilOrchestrator;
 use App\Council\Exceptions\QuorumNotMetException;
 use App\Council\ReviewMode;
 use App\Council\ReviewRequest;
-use Illuminate\Support\Facades\Http;
-
-// orchestrator(), chatBody(), and findingsJson() come from tests/Pest.php (Task 5, Step 1a).
 
 it('produces a complete council review', function () {
-    Http::fake(function ($req) {
-        return $req['model'] === 'judge/strong'
-            ? Http::response(chatBody(findingsJson()))
-            : Http::response(chatBody("critique {$req['model']}"));
-    });
+    PanelistAgent::fake(['c1', 'c2', 'c3']);
+    JudgeAgent::fake([['findings' => [validFinding()]]]);
 
     $result = orchestrator()->review('SPEC', new ReviewRequest(ReviewMode::Council));
 
@@ -1225,22 +1095,15 @@ it('produces a complete council review', function () {
 });
 
 it('fails the council review when quorum is not met', function () {
-    Http::fake(function ($req) {
-        // only a/one ever succeeds; b/two and c/three fail both attempts
-        return $req['model'] === 'a/one'
-            ? Http::response(chatBody('critique a/one'))
-            : Http::response('err', 500);
-    });
+    PanelistAgent::fake(fn () => throw new RuntimeException('down')); // all panelists fail both attempts
+    JudgeAgent::fake();
 
     orchestrator()->review('SPEC', new ReviewRequest(ReviewMode::Council));
 })->throws(QuorumNotMetException::class);
 
 it('produces a baseline review from a single model', function () {
-    Http::fake(function ($req) {
-        return $req['model'] === 'judge/strong'
-            ? Http::response(chatBody(findingsJson()))
-            : Http::response(chatBody("critique {$req['model']}"));
-    });
+    PanelistAgent::fake(['only critique']);
+    JudgeAgent::fake([['findings' => [validFinding()]]]);
 
     $result = orchestrator()->review('SPEC', new ReviewRequest(ReviewMode::Baseline));
 
@@ -1251,8 +1114,7 @@ it('produces a baseline review from a single model', function () {
 });
 
 it('resolves the orchestrator from the container', function () {
-    expect(app(\App\Council\CouncilOrchestrator::class))
-        ->toBeInstanceOf(\App\Council\CouncilOrchestrator::class);
+    expect(app(CouncilOrchestrator::class))->toBeInstanceOf(CouncilOrchestrator::class);
 });
 ```
 
@@ -1263,13 +1125,7 @@ Expected: FAIL — `Call to undefined method ...::review()`.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Add `use` lines at the top of `app/Council/CouncilOrchestrator.php`:
-
-```php
-use App\Council\Exceptions\QuorumNotMetException;
-```
-
-Add to `CouncilOrchestrator`:
+Add `use App\Council\Exceptions\QuorumNotMetException;` to `CouncilOrchestrator`, then add:
 
 ```php
 public function review(string $spec, ReviewRequest $request): ReviewResult
@@ -1281,21 +1137,18 @@ public function review(string $spec, ReviewRequest $request): ReviewResult
     $ok = array_values(array_filter($panel, fn (PanelResponse $r) => $r->ok));
 
     if ($request->mode === ReviewMode::Council && count($ok) < $this->config['quorum']) {
-        $dead = array_map(
+        $dead = array_values(array_map(
             fn (PanelResponse $r) => $r->model,
             array_filter($panel, fn (PanelResponse $r) => ! $r->ok),
-        );
-        throw new QuorumNotMetException(array_values($dead), count($ok), $this->config['quorum']);
+        ));
+        throw new QuorumNotMetException($dead, count($ok), $this->config['quorum']);
     }
 
     $critiques = array_map(fn (PanelResponse $r) => ['model' => $r->model, 'content' => $r->content], $ok);
     $judge = $this->runJudge($spec, $critiques);
 
-    $metrics = array_map(
-        fn (PanelResponse $r) => ['model' => $r->model, 'ms' => $r->ms, 'costUsd' => $r->costUsd],
-        $panel,
-    );
-    $metrics[] = ['model' => $this->config['judge'], 'ms' => $judge['ms'], 'costUsd' => $judge['costUsd']];
+    $metrics = array_map(fn (PanelResponse $r) => ['model' => $r->model, 'ms' => $r->ms], $panel);
+    $metrics[] = ['model' => $this->config['judge'], 'ms' => $judge['ms']];
 
     return new ReviewResult(
         mode: $request->mode,
@@ -1318,11 +1171,13 @@ public function review(string $spec, ReviewRequest $request): ReviewResult
 private function baselinePanel(string $spec): array
 {
     $model = $this->config['baseline'] ?? $this->config['panelists'][0];
-    $result = $this->client->pool([$model => ['messages' => PanelPrompt::build($spec)]])[$model];
+    $userPrompt = PanelPrompt::userPrompt($spec);
 
-    return [$result['ok']
-        ? PanelResponse::ok($model, $result['content'], $result['ms'], $result['costUsd'])
-        : PanelResponse::failed($model, $result['error'] ?? 'unknown error')];
+    return [
+        $this->promptPanelist($userPrompt, $model)
+            ?? $this->promptPanelist($userPrompt, $model)
+            ?? PanelResponse::failed($model, 'baseline call failed after retry'),
+    ];
 }
 ```
 
@@ -1331,7 +1186,6 @@ Add binding in `app/Providers/AppServiceProvider.php` `register()`:
 ```php
 $this->app->singleton(\App\Council\CouncilOrchestrator::class, function ($app) {
     return new \App\Council\CouncilOrchestrator(
-        $app->make(\App\Council\OpenRouter\OpenRouterClient::class),
         $app->make(\App\Council\FindingValidator::class),
         $app['config']->get('oast'),
     );
@@ -1363,7 +1217,7 @@ git commit -m "feat: wire council and baseline review modes"
 **Interfaces:**
 - Consumes: `App\Council\ReviewResult`.
 - Produces:
-  - `App\Models\Review` Eloquent model with JSON-cast columns and `Review::fromResult(ReviewResult $result, ?string $specRef, string $specHash): self` (creates and returns the persisted row).
+  - `App\Models\Review` with JSON-cast columns and `Review::fromResult(ReviewResult $result, ?string $specRef, string $specHash): self`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1382,13 +1236,11 @@ it('persists a review result and casts json columns', function () {
         panelSize: 2,
         rawPanelResponses: [['model' => 'a/one', 'ok' => true, 'content' => 'c', 'error' => null]],
         findings: [['title' => 'finding one']],
-        metrics: [['model' => 'a/one', 'ms' => 10, 'costUsd' => 0.1]],
+        metrics: [['model' => 'a/one', 'ms' => 10]],
         status: 'complete',
     );
 
     $review = Review::fromResult($result, 'openapi.yaml', 'abc123');
-
-    expect($review->exists)->toBeTrue();
 
     $fresh = Review::find($review->id);
     expect($fresh->spec_ref)->toBe('openapi.yaml')
@@ -1495,78 +1347,76 @@ git commit -m "feat: add reviews table and model"
 
 ---
 
-### Task 9: HTTP endpoint `POST /v1/reviews`
+### Task 9: API endpoint — `POST https://api.<domain>/v1/reviews` (ADR action)
 
 **Files:**
 - Create: `routes/api.php`
 - Create: `app/Http/Requests/StoreReviewRequest.php`
-- Create: `app/Http/Controllers/ReviewController.php`
+- Create: `app/Actions/Reviews/CreateReviewAction.php`
+- Create: `app/Http/Resources/ReviewResource.php`
 - Modify: `bootstrap/app.php`
-- Modify: `tests/Pest.php` (add `fakeCouncilHttp()` helper, reused by Task 10)
+- Modify: `tests/Pest.php` (add `fakeCouncil()` helper, reused by Task 10)
 - Test: `tests/Feature/ReviewEndpointTest.php`
 
 **Interfaces:**
-- Consumes: `CouncilOrchestrator` (resolved from container), `Review::fromResult`, domain exceptions.
+- Consumes: `CouncilOrchestrator`, `Review::fromResult`, domain exceptions, `config('oast.api_domain')`.
 - Produces:
-  - `POST /v1/reviews` accepting JSON `{ "spec": "<raw spec>", "mode": "council|baseline" }` (mode optional, defaults `council`).
-  - Success → `200` JSON `{ mode, dimension, panel_size, findings, metrics, status }`.
-  - Domain failure (`QuorumNotMetException`, `InvalidJudgeOutputException`, `OpenRouterException`) → persisted `status = error` row + `422` JSON `{ status: "error", message }`.
+  - Route `POST /v1/reviews` bound to the `api.*` subdomain, handled by the invokable `CreateReviewAction` (ADR action). Request body `{ "spec": "<raw spec>", "mode": "council|baseline" }` (mode optional, defaults `council`).
+  - Success → `ReviewResource` (`200`, JSON under `data`).
+  - Domain failure → persisted `status = error` row + `422` JSON `{ status: "error", message }`.
 
-- [ ] **Step 1a: Add the `fakeCouncilHttp()` helper to `tests/Pest.php`**
+- [ ] **Step 1a: Add the `fakeCouncil()` helper to `tests/Pest.php`**
 
-This fakes a full council HTTP flow against the **real** configured panelists/judge (`config('oast.judge')`), reused by Task 10. Append to `tests/Pest.php`:
+Append to `tests/Pest.php`. Fakes a full successful council/baseline flow for the **real** agents.
 
 ```php
-function fakeCouncilHttp(): void
+function fakeCouncil(): void
 {
-    $findings = findingsJson();
-
-    \Illuminate\Support\Facades\Http::fake(function ($req) use ($findings) {
-        $content = $req['model'] === config('oast.judge') ? $findings : 'critique';
-
-        return \Illuminate\Support\Facades\Http::response([
-            'choices' => [['message' => ['content' => $content]]],
-            'usage' => ['cost' => 0.01],
-        ]);
-    });
+    \App\Ai\Agents\PanelistAgent::fake(['critique a', 'critique b', 'critique c']);
+    \App\Ai\Agents\JudgeAgent::fake([['findings' => [validFinding()]]]);
 }
 ```
+
+> `validFinding()` is defined in `tests/Unit/Council/FindingValidatorTest.php` and is available across the suite. If you prefer, move `validFinding()` into `tests/Pest.php` so all helper data lives in one place.
 
 - [ ] **Step 1: Write the failing test**
 
 ```php
 <?php
 
+use App\Ai\Agents\PanelistAgent;
 use App\Models\Review;
-use Illuminate\Support\Facades\Http;
 
-// fakeCouncilHttp() comes from tests/Pest.php (Step 1a).
+// fakeCouncil() comes from tests/Pest.php (Step 1a).
+
+beforeEach(fn () => config(['oast.api_domain' => 'api.oast.test']));
 
 it('runs a council review over http and persists it', function () {
-    fakeCouncilHttp();
+    fakeCouncil();
 
-    $response = $this->postJson('/v1/reviews', ['spec' => "openapi: 3.1.0", 'mode' => 'council']);
+    $response = $this->postJson('http://api.oast.test/v1/reviews', [
+        'spec' => 'openapi: 3.1.0',
+        'mode' => 'council',
+    ]);
 
     $response->assertOk()
-        ->assertJsonPath('status', 'complete')
-        ->assertJsonPath('mode', 'council')
-        ->assertJsonCount(1, 'findings');
+        ->assertJsonPath('data.status', 'complete')
+        ->assertJsonPath('data.mode', 'council')
+        ->assertJsonCount(1, 'data.findings');
 
     expect(Review::where('status', 'complete')->count())->toBe(1);
 });
 
 it('requires a spec', function () {
-    $this->postJson('/v1/reviews', ['mode' => 'council'])
+    $this->postJson('http://api.oast.test/v1/reviews', ['mode' => 'council'])
         ->assertStatus(422)
         ->assertJsonValidationErrorFor('spec');
 });
 
 it('persists an error row and returns 422 when quorum is not met', function () {
-    Http::fake(fn ($req) => $req['model'] === config('oast.panelists')[0]
-        ? Http::response(['choices' => [['message' => ['content' => 'crit']]], 'usage' => ['cost' => 0.01]])
-        : Http::response('err', 500));
+    PanelistAgent::fake(fn () => throw new RuntimeException('down'));
 
-    $this->postJson('/v1/reviews', ['spec' => 'openapi: 3.1.0', 'mode' => 'council'])
+    $this->postJson('http://api.oast.test/v1/reviews', ['spec' => 'openapi: 3.1.0', 'mode' => 'council'])
         ->assertStatus(422)
         ->assertJsonPath('status', 'error');
 
@@ -1581,7 +1431,7 @@ Expected: FAIL — 404 (route not registered) / class not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Modify `bootstrap/app.php` — update the `withRouting` and `withExceptions` calls:
+Modify `bootstrap/app.php` — register API routes (no path prefix; the subdomain is applied in the route file) and JSON rendering for `v1/*`:
 
 ```php
 return Application::configure(basePath: dirname(__DIR__))
@@ -1597,7 +1447,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('v1/*') || $request->is('api/*'),
+            fn (Request $request) => $request->is('v1/*'),
         );
     })->create();
 ```
@@ -1607,10 +1457,12 @@ return Application::configure(basePath: dirname(__DIR__))
 ```php
 <?php
 
-use App\Http\Controllers\ReviewController;
+use App\Actions\Reviews\CreateReviewAction;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/v1/reviews', [ReviewController::class, 'store']);
+Route::domain(config('oast.api_domain'))->group(function () {
+    Route::post('/v1/reviews', CreateReviewAction::class);
+});
 ```
 
 `app/Http/Requests/StoreReviewRequest.php`:
@@ -1641,34 +1493,61 @@ class StoreReviewRequest extends FormRequest
 }
 ```
 
-`app/Http/Controllers/ReviewController.php`:
+`app/Http/Resources/ReviewResource.php`:
 
 ```php
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Resources;
+
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class ReviewResource extends JsonResource
+{
+    public function toArray($request): array
+    {
+        return [
+            'mode' => $this->mode,
+            'dimension' => $this->dimension,
+            'panel_size' => $this->panel_size,
+            'findings' => $this->findings,
+            'metrics' => $this->metrics,
+            'status' => $this->status,
+        ];
+    }
+}
+```
+
+`app/Actions/Reviews/CreateReviewAction.php`:
+
+```php
+<?php
+
+namespace App\Actions\Reviews;
 
 use App\Council\CouncilOrchestrator;
 use App\Council\Exceptions\InvalidJudgeOutputException;
-use App\Council\Exceptions\OpenRouterException;
 use App\Council\Exceptions\QuorumNotMetException;
 use App\Council\ReviewMode;
 use App\Council\ReviewRequest;
 use App\Http\Requests\StoreReviewRequest;
+use App\Http\Resources\ReviewResource;
 use App\Models\Review;
 use Illuminate\Http\JsonResponse;
 
-class ReviewController extends Controller
+class CreateReviewAction
 {
-    public function store(StoreReviewRequest $request, CouncilOrchestrator $orchestrator): JsonResponse
+    public function __construct(private CouncilOrchestrator $orchestrator) {}
+
+    public function __invoke(StoreReviewRequest $request): ReviewResource|JsonResponse
     {
         $spec = (string) $request->string('spec');
         $mode = ReviewMode::from($request->input('mode', 'council'));
         $hash = hash('sha256', $spec);
 
         try {
-            $result = $orchestrator->review($spec, new ReviewRequest($mode));
-        } catch (QuorumNotMetException|InvalidJudgeOutputException|OpenRouterException $e) {
+            $result = $this->orchestrator->review($spec, new ReviewRequest($mode));
+        } catch (QuorumNotMetException|InvalidJudgeOutputException $e) {
             Review::create([
                 'spec_ref' => null,
                 'spec_hash' => $hash,
@@ -1682,16 +1561,7 @@ class ReviewController extends Controller
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 422);
         }
 
-        Review::fromResult($result, null, $hash);
-
-        return response()->json([
-            'mode' => $result->mode->value,
-            'dimension' => $result->dimension,
-            'panel_size' => $result->panelSize,
-            'findings' => $result->findings,
-            'metrics' => $result->metrics,
-            'status' => $result->status,
-        ]);
+        return new ReviewResource(Review::fromResult($result, null, $hash));
     }
 }
 ```
@@ -1704,9 +1574,9 @@ Expected: PASS (3 passed).
 - [ ] **Step 5: Format and commit**
 
 ```bash
-vendor/bin/pint app/Http routes/api.php bootstrap/app.php
-git add app/Http routes/api.php bootstrap/app.php tests/Feature/ReviewEndpointTest.php
-git commit -m "feat: add POST /v1/reviews endpoint"
+vendor/bin/pint app/Actions app/Http routes/api.php bootstrap/app.php tests/Pest.php
+git add app/Actions app/Http routes/api.php bootstrap/app.php tests/Pest.php tests/Feature/ReviewEndpointTest.php
+git commit -m "feat: add POST /v1/reviews on api subdomain via ADR action"
 ```
 
 ---
@@ -1720,7 +1590,7 @@ git commit -m "feat: add POST /v1/reviews endpoint"
 **Interfaces:**
 - Consumes: `CouncilOrchestrator`, `Review::fromResult`.
 - Produces:
-  - `php artisan oast:review {spec : path to spec file} {--baseline}`. Reads the file, runs the orchestrator **live**, persists, prints a findings table + total cost. `--baseline` selects baseline mode. Returns `Command::FAILURE` (and persists an error row) on a missing file or domain exception.
+  - `php artisan oast:review {spec : path to spec file} {--baseline}`. Reads the file, runs the orchestrator live, persists, prints a findings table. `--baseline` selects baseline mode. Returns `Command::FAILURE` (and persists an error row) on a missing file or domain exception.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1729,12 +1599,12 @@ git commit -m "feat: add POST /v1/reviews endpoint"
 
 use App\Models\Review;
 
-// fakeCouncilHttp() comes from tests/Pest.php (Task 9, Step 1a).
+// fakeCouncil() comes from tests/Pest.php (Task 9, Step 1a).
 
 it('runs a baseline review from a spec file and persists it', function () {
-    fakeCouncilHttp();
+    fakeCouncil();
     $path = sys_get_temp_dir().'/oast-spec-'.uniqid().'.yaml';
-    file_put_contents($path, "openapi: 3.1.0");
+    file_put_contents($path, 'openapi: 3.1.0');
 
     $this->artisan('oast:review', ['spec' => $path, '--baseline' => true])
         ->assertSuccessful();
@@ -1766,7 +1636,6 @@ namespace App\Console\Commands;
 
 use App\Council\CouncilOrchestrator;
 use App\Council\Exceptions\InvalidJudgeOutputException;
-use App\Council\Exceptions\OpenRouterException;
 use App\Council\Exceptions\QuorumNotMetException;
 use App\Council\ReviewMode;
 use App\Council\ReviewRequest;
@@ -1797,7 +1666,7 @@ class ReviewCommand extends Command
 
         try {
             $result = $orchestrator->review($spec, new ReviewRequest($mode));
-        } catch (QuorumNotMetException|InvalidJudgeOutputException|OpenRouterException $e) {
+        } catch (QuorumNotMetException|InvalidJudgeOutputException $e) {
             Review::create([
                 'spec_ref' => $path,
                 'spec_hash' => $hash,
@@ -1821,9 +1690,8 @@ class ReviewCommand extends Command
             ])->all(),
         );
 
-        $totalCost = collect($result->metrics)->sum('costUsd');
-        $this->info(sprintf('Panel size: %d  |  Findings: %d  |  Total cost: $%.4f  |  Review #%d',
-            $result->panelSize, count($result->findings), $totalCost, $review->id));
+        $this->info(sprintf('Panel size: %d  |  Findings: %d  |  Review #%d',
+            $result->panelSize, count($result->findings), $review->id));
 
         return self::SUCCESS;
     }
@@ -1850,13 +1718,12 @@ git commit -m "feat: add oast:review artisan command"
 **Files:**
 - Create: `tests/Feature/LiveCouncilTest.php`
 - Modify: `composer.json` (the `test` script)
-- Test: (this task's deliverable is itself a test file; verify it is skipped by default)
 
 **Interfaces:**
-- Consumes: the real `oast:review` path and live OpenRouter API.
-- Produces: a `live`-grouped test that is excluded from `composer test` and runnable on demand via `vendor/bin/pest --group=live`.
+- Consumes: the real orchestrator path and live OpenRouter (via the SDK).
+- Produces: a `live`-grouped test excluded from `composer test`, runnable via `vendor/bin/pest --group=live`.
 
-- [ ] **Step 1: Write the live test (no Http::fake)**
+- [ ] **Step 1: Write the live test (no fakes)**
 
 ```php
 <?php
@@ -1866,7 +1733,7 @@ use App\Council\ReviewMode;
 use App\Council\ReviewRequest;
 
 it('runs a real council review against OpenRouter', function () {
-    if (blank(config('oast.api_key'))) {
+    if (blank(config('ai.providers.openrouter.key'))) {
         $this->markTestSkipped('OPENROUTER_API_KEY not set.');
     }
 
@@ -1885,18 +1752,9 @@ it('runs a real council review against OpenRouter', function () {
 })->group('live');
 ```
 
-- [ ] **Step 2: Verify it is excluded from the default suite**
+- [ ] **Step 2: Exclude the live group from the default suite**
 
-Modify the `test` script in `composer.json` so the default run skips live tests. Change:
-
-```json
-"test": [
-    "@php artisan config:clear --ansi",
-    "@php artisan test"
-],
-```
-
-to:
+Change the `test` script in `composer.json`:
 
 ```json
 "test": [
@@ -1908,7 +1766,7 @@ to:
 - [ ] **Step 3: Run the default suite and confirm the live test does not execute**
 
 Run: `composer test`
-Expected: PASS; the live test is reported as not run (excluded). All faked tests pass.
+Expected: PASS; live test reported as not run (excluded). All faked tests pass.
 
 - [ ] **Step 4: (Manual, optional) Run the live test on demand**
 
@@ -1928,5 +1786,7 @@ git commit -m "test: add live council smoke test excluded from default suite"
 ## Final verification
 
 - [ ] Run the full default suite: `composer test` — all green, live excluded.
-- [ ] Run Pint across the project: `vendor/bin/pint --test` — no style violations.
-- [ ] Confirm the M0 fixture decision (build-spec Decision #4) is settled and set valid OpenRouter model slugs in `config/oast.php` before the first `vendor/bin/pest --group=live` run.
+- [ ] Run Pint (PER) across the project: `vendor/bin/pint --test` — no style violations.
+- [ ] Confirm the two flagged SDK details (per-call usage/cost accessor; structured-output fake API) against the installed `laravel/ai` version; wire per-model token/cost into `metrics` if available.
+- [ ] Confirm the M0 fixture decision (build-spec Decision #4) and set valid OpenRouter model slugs in `config/oast.php` before the first `vendor/bin/pest --group=live` run.
+- [ ] Update `AGENTS.md`: note the `pint.json` PER preset (the file currently says "no `pint.json`, default preset") and the Laravel AI SDK / OpenRouter provider setup.
