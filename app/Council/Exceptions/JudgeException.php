@@ -17,7 +17,7 @@ final class JudgeException extends Exception implements Responsable
     private function __construct(
         protected $message,
         protected $code = 0,
-        protected $previous = null,
+        $previous = null,
         public readonly array $errors = [],
     ) {
         parent::__construct($message, $code, $previous);
