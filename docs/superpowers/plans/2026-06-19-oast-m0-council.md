@@ -395,7 +395,7 @@ themselves via **`toProblemDetails()`**, keeping HTTP-shaping out of the action.
   - `App\Http\Problems\ProblemDetailsResponse implements Responsable` — `new ProblemDetailsResponse(ApiProblem $problem, int $status)`; static `fromValidation(ValidationException $e): self`; `toResponse($request): \Illuminate\Http\Response` emitting `application/problem+json`. The "simple wrapper" — returnable directly from an action (Laravel renders `Responsable`).
   - `App\Http\Problems\ProvidesProblemDetails extends \Throwable` — `toProblemDetails(): ProblemDetailsResponse`. Implemented by every domain exception, so the action catches the *interface*.
   - `App\Council\Exceptions\InvalidJudgeOutputException` — `implements ProvidesProblemDetails`, **private constructor**, factory `static withErrors(array $errors): self`, public readonly `array $errors`; `toProblemDetails()` → `502`.
-  - `App\Council\FindingValidator::validate(array $findings): array` — returns the findings on success; throws `InvalidJudgeOutputException::withErrors(...)` on any violation. The SDK's structured output enforces enums/required fields at the provider layer; this validator is defense-in-depth **and** owns the conditional rule (`disagreement` required when `confidence = split`) that the schema marks optional.
+  - `App\Council\FindingValidator::validate(array $findings): array` — the `JudgeAgent`'s `HasStructuredOutput` schema already enforces enums and required fields at the provider layer, so this validator owns **only** the one rule JSON Schema can't express: `disagreement` is required when `confidence = split`. Returns the findings unchanged otherwise (an empty list is valid — a clean spec); throws `InvalidJudgeOutputException::withErrors(...)` when a split finding lacks `disagreement`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -467,9 +467,13 @@ function validFinding(array $overrides = []): array
     ], $overrides);
 }
 
-it('accepts a well-formed finding', function () {
+it('returns valid findings unchanged', function () {
     $findings = [validFinding()];
     expect((new FindingValidator)->validate($findings))->toBe($findings);
+});
+
+it('allows an empty findings list (a clean spec)', function () {
+    expect((new FindingValidator)->validate([]))->toBe([]);
 });
 
 it('requires disagreement when confidence is split', function () {
@@ -481,29 +485,19 @@ it('accepts a split finding that includes disagreement', function () {
     expect((new FindingValidator)->validate($findings))->toBe($findings);
 });
 
-it('rejects an invalid severity enum', function () {
-    (new FindingValidator)->validate([validFinding(['severity' => 'critical'])]);
-})->throws(InvalidJudgeOutputException::class);
-
-it('rejects a finding missing location', function () {
-    $finding = validFinding();
-    unset($finding['location']);
-    (new FindingValidator)->validate([$finding]);
-})->throws(InvalidJudgeOutputException::class);
-
-it('rejects an empty payload', function () {
-    (new FindingValidator)->validate([]);
-})->throws(InvalidJudgeOutputException::class);
-
 it('exposes validation errors on the exception', function () {
     try {
-        (new FindingValidator)->validate([validFinding(['severity' => 'nope'])]);
+        (new FindingValidator)->validate([validFinding(['confidence' => 'split'])]);
         $this->fail('expected exception');
     } catch (InvalidJudgeOutputException $e) {
         expect($e->errors)->toBeArray()->not->toBeEmpty();
     }
 });
 ```
+
+> The enum/required/location checks that used to live here are intentionally gone — the
+> `JudgeAgent` schema enforces them at the provider layer. The validator's sole remaining
+> job is the conditional `disagreement`-when-`split` rule that JSON Schema can't express.
 
 - [ ] **Step 2: Run tests to verify they fail**
 
@@ -620,7 +614,7 @@ final class InvalidJudgeOutputException extends RuntimeException implements Prov
 }
 ```
 
-`app/Council/FindingValidator.php`:
+`app/Council/FindingValidator.php` — the enums and required fields are guaranteed by the `JudgeAgent` schema, so this only enforces the conditional rule the schema can't:
 
 ```php
 <?php
@@ -628,38 +622,16 @@ final class InvalidJudgeOutputException extends RuntimeException implements Prov
 namespace App\Council;
 
 use App\Council\Exceptions\InvalidJudgeOutputException;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class FindingValidator
 {
     public function validate(array $findings): array
     {
-        if ($findings === [] || ! array_is_list($findings)) {
-            throw InvalidJudgeOutputException::withErrors(['findings' => 'Expected a non-empty list of findings.']);
-        }
-
         foreach ($findings as $index => $finding) {
-            $validator = Validator::make(
-                is_array($finding) ? $finding : [],
-                [
-                    'dimension' => ['required', 'string'],
-                    'title' => ['required', 'string'],
-                    'severity' => ['required', Rule::in(['blocker', 'should-fix', 'consider'])],
-                    'confidence' => ['required', Rule::in(['consensus', 'majority', 'split', 'lone-flag'])],
-                    'location' => ['required', 'string'],
-                    'finding' => ['required', 'string'],
-                    'why_it_matters' => ['required', 'string'],
-                    'suggested_change' => ['required', 'string'],
-                    'disagreement' => [
-                        Rule::requiredIf(($finding['confidence'] ?? null) === 'split'),
-                        'string',
-                    ],
-                ],
-            );
-
-            if ($validator->fails()) {
-                throw InvalidJudgeOutputException::withErrors([$index => $validator->errors()->toArray()]);
+            if (($finding['confidence'] ?? null) === 'split' && blank($finding['disagreement'] ?? null)) {
+                throw InvalidJudgeOutputException::withErrors([
+                    $index => ['disagreement' => 'A split finding must include `disagreement`.'],
+                ]);
             }
         }
 
@@ -671,7 +643,7 @@ class FindingValidator
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `vendor/bin/pest tests/Unit/Http/ProblemDetailsTest.php tests/Unit/Council/FindingValidatorTest.php`
-Expected: PASS (3 + 7 passed).
+Expected: PASS (3 + 5 passed).
 
 - [ ] **Step 5: Format and commit**
 

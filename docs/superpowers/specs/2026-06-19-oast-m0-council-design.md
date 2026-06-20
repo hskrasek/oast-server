@@ -63,10 +63,10 @@ outside) while giving M0 both an experiment driver and the REST-core deliverable
 - **Judge pass:** the `JudgeAgent` (`implements HasStructuredOutput`) runs one **dedicated
   strong model**, never a panelist. Receives the spec + all panel critiques + the
   Dimension 1 rubric (the rubric lives in the agent's `instructions()`). The SDK's
-  **structured output (`schema()`)** forces the `{findings: [...]}` shape at the provider
-  layer; the `FindingValidator` adds defense-in-depth and owns the conditional rule
-  (`disagreement` required when `confidence = split`, which the schema marks optional),
-  with **one re-prompt retry** on validation failure. Second failure → error.
+  **structured output (`schema()`)** forces the `{findings: [...]}` shape — enums and
+  required fields — at the provider layer. The `FindingValidator` therefore enforces
+  **only** the one rule JSON Schema can't express (`disagreement` required when
+  `confidence = split`), with **one re-prompt retry** if it's violated. Second failure → error.
 - **Returns** a `ReviewResult`: `findings[]`, per-model `{ms}`, `panelSize`,
   `mode` (council | baseline), `status`. (Per-model token/cost is a fast follow-up once
   the SDK's per-response usage accessor is confirmed — see Persistence.)
@@ -76,8 +76,11 @@ outside) while giving M0 both an experiment driver and the REST-core deliverable
 `OPENROUTER_API_KEY`. Native multi-provider (Anthropic/OpenAI/Gemini with separate keys)
 is an M1 option. The M0 endpoint is single-user with no auth layer.
 
-**Finding validator** — validates judge output against the per-finding schema before it
-leaves the engine. Required fields and enums:
+**Finding validator** — the per-finding contract below is enforced by the `JudgeAgent`'s
+`HasStructuredOutput` schema (enums, required fields) at the provider layer. The
+`FindingValidator` only enforces the one conditional rule JSON Schema can't express —
+`disagreement` required when `confidence = split` — and otherwise passes findings through
+(an empty list is valid: a clean spec). The full contract, for reference:
 
 ```jsonc
 {
@@ -220,7 +223,7 @@ a right answer to compare against).
 |---|---|
 | Panel composition | 3 models hardcoded for M0 (diverse frontier default), config-driven in M1. |
 | Judge model | Dedicated strong model, never a panelist. |
-| Judge validation | SDK structured output (`HasStructuredOutput`) + `FindingValidator` for the conditional rule + one re-prompt retry. |
+| Judge validation | SDK structured output (`HasStructuredOutput`) enforces shape; `FindingValidator` owns only the `split`→`disagreement` rule; one re-prompt retry. |
 | Panel partial failure | Retry each failed model once, then ≥2 quorum floor. |
 | Spec input | Raw spec as-is; "digest" deferred. |
 | M0 persistence | Persist run artifacts to a `reviews` table. |
