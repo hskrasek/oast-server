@@ -1,15 +1,15 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "oastsh/server",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "The Laravel core of oast.sh — a spec-first platform for reviewing and iterating on API specifications with a multi-model design panel (the Council).",
     "keywords": [
         "laravel",
         "framework"
     ],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.5",
         "laravel/framework": "^13.8",
         "laravel/tinker": "^3.0"
     },
