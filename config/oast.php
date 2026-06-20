@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     'timeout' => (int) env('OAST_TIMEOUT', 120),
 

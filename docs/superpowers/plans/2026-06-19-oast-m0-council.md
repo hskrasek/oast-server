@@ -61,7 +61,7 @@
   - `pint.json` with `"preset": "per"`.
   - `Unit` suite runs with the Laravel application booted.
 
-- [ ] **Step 1: Install the SDK and bump PHP**
+- [x] **Step 1: Install the SDK and bump PHP**
 
 ```bash
 # Set "php": "^8.5" in composer.json's require block first, then:
@@ -83,7 +83,7 @@ Edit `composer.json` `require` so it reads:
 
 (Use whatever stable constraints `composer require` resolves; the lines above are the shape.)
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```php
 <?php
@@ -106,12 +106,12 @@ it('uses the PER pint preset', function () {
 });
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 Run: `vendor/bin/pest tests/Unit/SetupConfigTest.php`
 Expected: FAIL — `config('oast...')` null / `pint.json` missing. (If the `Unit` suite errors because the app isn't booted, that confirms Step 4 is required.)
 
-- [ ] **Step 4: Write minimal implementation**
+- [x] **Step 4: Write minimal implementation**
 
 In `tests/Pest.php`, after the existing `->in('Feature');` line, add:
 
@@ -174,12 +174,12 @@ OPENROUTER_URL=
 OAST_API_DOMAIN=api.oast.test
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Run: `vendor/bin/pest tests/Unit/SetupConfigTest.php`
 Expected: PASS (3 passed).
 
-- [ ] **Step 6: Reformat to PER and commit**
+- [x] **Step 6: Reformat to PER and commit**
 
 ```bash
 vendor/bin/pint
