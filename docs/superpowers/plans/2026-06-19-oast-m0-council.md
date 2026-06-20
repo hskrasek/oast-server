@@ -10,7 +10,8 @@
 
 ## Global Constraints
 
-- PHP `^8.5`, Laravel `^13.8`, Pest `^4.7`. Add exactly one runtime dependency: `laravel/ai`.
+- PHP `^8.5`, Laravel `^13.8`, Pest `^4.7`. Add exactly two runtime dependencies: `laravel/ai` and `crell/api-problem`.
+- **API errors use Problem Details (RFC 9457)** — `application/problem+json` via the `crell/api-problem` library, wrapped by a thin Laravel responder (`App\Http\ProblemDetails`). This covers both domain failures and request-validation failures on the `api.*` subdomain.
 - **Models reach OpenRouter via the Laravel AI SDK's built-in `openrouter` provider** (`Lab::OpenRouter`), single key `OPENROUTER_API_KEY`. Panelist/judge model slugs come from `config/oast.php` and are passed as per-prompt `model:` overrides. (Native multi-provider is an M1 option.)
 - Tests run against in-memory SQLite (`phpunit.xml`); `RefreshDatabase` is auto-applied to `Feature` via `tests/Pest.php`. The `Unit` suite is bound to `Tests\TestCase` (Task 1) so SDK facades/helpers work there too.
 - **All LLM tests use the SDK's native fakes** (`PanelistAgent::fake()`, `JudgeAgent::fake()`) — no live calls in the default suite. Live tests are tagged `->group('live')` and excluded from `composer test`.
@@ -64,7 +65,7 @@
 
 ```bash
 # Set "php": "^8.5" in composer.json's require block first, then:
-composer require laravel/ai
+composer require laravel/ai crell/api-problem
 php artisan vendor:publish --tag=ai-config   # writes config/ai.php
 ```
 
@@ -73,13 +74,14 @@ Edit `composer.json` `require` so it reads:
 ```json
 "require": {
     "php": "^8.5",
+    "crell/api-problem": "^3.8",
     "laravel/ai": "^0.1",
     "laravel/framework": "^13.8",
     "laravel/tinker": "^3.0"
 },
 ```
 
-(Use whatever stable `laravel/ai` constraint `composer require` resolves; the line above is the shape.)
+(Use whatever stable constraints `composer require` resolves; the lines above are the shape.)
 
 - [ ] **Step 2: Write the failing test**
 
@@ -182,7 +184,7 @@ Expected: PASS (3 passed).
 ```bash
 vendor/bin/pint
 git add composer.json composer.lock config/ai.php config/oast.php pint.json tests/Pest.php .env.example tests/Unit/SetupConfigTest.php
-git commit -m "chore: install Laravel AI SDK, add oast config, adopt PER pint preset"
+git commit -m "chore: install Laravel AI SDK + api-problem, add oast config, adopt PER pint preset"
 ```
 
 ---
@@ -1352,6 +1354,8 @@ git commit -m "feat: add reviews table and model"
 **Files:**
 - Create: `routes/api.php`
 - Create: `app/Http/Requests/StoreReviewRequest.php`
+- Create: `app/Http/Problems/ProblemType.php`
+- Create: `app/Http/ProblemDetails.php`
 - Create: `app/Actions/Reviews/CreateReviewAction.php`
 - Create: `app/Http/Resources/ReviewResource.php`
 - Modify: `bootstrap/app.php`
@@ -1359,11 +1363,13 @@ git commit -m "feat: add reviews table and model"
 - Test: `tests/Feature/ReviewEndpointTest.php`
 
 **Interfaces:**
-- Consumes: `CouncilOrchestrator`, `Review::fromResult`, domain exceptions, `config('oast.api_domain')`.
+- Consumes: `CouncilOrchestrator`, `Review::fromResult`, domain exceptions, `config('oast.api_domain')`, `Crell\ApiProblem\ApiProblem`.
 - Produces:
   - Route `POST /reviews` bound to the `api.*` subdomain, handled by the invokable `CreateReviewAction` (ADR action). Unversioned by path — the API evolves backwards-compatibly. Request body `{ "spec": "<raw spec>", "mode": "council|baseline" }` (mode optional, defaults `council`).
   - Success → `ReviewResource` (`200`, JSON under `data`).
-  - Domain failure → persisted `status = error` row + `422` JSON `{ status: "error", message }`.
+  - `App\Http\ProblemDetails::response(ApiProblem $problem, int $status, array $headers = []): \Illuminate\Http\Response` — sets the status on the problem and returns it as `application/problem+json`.
+  - `App\Http\Problems\ProblemType` — type-URI constants (`VALIDATION`, `QUORUM_NOT_MET`, `JUDGE_OUTPUT_INVALID`).
+  - Errors are **Problem Details (RFC 9457)**: request validation → `422` problem+json (rendered globally for the api host); `QuorumNotMetException` → `503` problem+json (+ `failed_models` extension) and a persisted `status = error` row; `InvalidJudgeOutputException` → `502` problem+json and a persisted error row.
 
 - [ ] **Step 1a: Add the `fakeCouncil()` helper to `tests/Pest.php`**
 
@@ -1407,18 +1413,23 @@ it('runs a council review over http and persists it', function () {
     expect(Review::where('status', 'complete')->count())->toBe(1);
 });
 
-it('requires a spec', function () {
+it('returns a problem+json validation error when spec is missing', function () {
     $this->postJson('http://api.oast.test/reviews', ['mode' => 'council'])
         ->assertStatus(422)
-        ->assertJsonValidationErrorFor('spec');
+        ->assertHeader('Content-Type', 'application/problem+json')
+        ->assertJsonPath('type', \App\Http\Problems\ProblemType::VALIDATION)
+        ->assertJsonPath('status', 422)
+        ->assertJsonPath('errors.spec.0', fn ($msg) => filled($msg));
 });
 
-it('persists an error row and returns 422 when quorum is not met', function () {
+it('persists an error row and returns a 503 problem+json when quorum is not met', function () {
     PanelistAgent::fake(fn () => throw new RuntimeException('down'));
 
     $this->postJson('http://api.oast.test/reviews', ['spec' => 'openapi: 3.1.0', 'mode' => 'council'])
-        ->assertStatus(422)
-        ->assertJsonPath('status', 'error');
+        ->assertStatus(503)
+        ->assertHeader('Content-Type', 'application/problem+json')
+        ->assertJsonPath('type', \App\Http\Problems\ProblemType::QUORUM_NOT_MET)
+        ->assertJsonPath('status', 503);
 
     expect(Review::where('status', 'error')->count())->toBe(1);
 });
@@ -1446,6 +1457,19 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Request-validation failures on the API subdomain become Problem Details.
+        $exceptions->render(function (\Illuminate\Validation\ValidationException $e, Request $request) {
+            if ($request->getHost() !== config('oast.api_domain')) {
+                return null; // fall through to default rendering off the API host
+            }
+
+            $problem = new \Crell\ApiProblem\ApiProblem('Validation failed', \App\Http\Problems\ProblemType::VALIDATION);
+            $problem->setDetail('The request payload failed validation.');
+            $problem['errors'] = $e->errors();
+
+            return \App\Http\ProblemDetails::response($problem, 422);
+        });
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->getHost() === config('oast.api_domain'),
         );
@@ -1518,6 +1542,48 @@ class ReviewResource extends JsonResource
 }
 ```
 
+`app/Http/Problems/ProblemType.php` — the M0 problem-type taxonomy (URIs are identifiers, not necessarily dereferenceable yet):
+
+```php
+<?php
+
+namespace App\Http\Problems;
+
+final class ProblemType
+{
+    public const VALIDATION = 'https://oast.sh/problems/validation';
+
+    public const QUORUM_NOT_MET = 'https://oast.sh/problems/quorum-not-met';
+
+    public const JUDGE_OUTPUT_INVALID = 'https://oast.sh/problems/judge-output-invalid';
+}
+```
+
+`app/Http/ProblemDetails.php` — the thin Laravel responder bridging `crell/api-problem` to an HttpFoundation response:
+
+```php
+<?php
+
+namespace App\Http;
+
+use Crell\ApiProblem\ApiProblem;
+use Illuminate\Http\Response;
+
+final class ProblemDetails
+{
+    public static function response(ApiProblem $problem, int $status, array $headers = []): Response
+    {
+        $problem->setStatus($status);
+
+        return response(
+            $problem->asJson(),
+            $status,
+            array_merge(['Content-Type' => 'application/problem+json'], $headers),
+        );
+    }
+}
+```
+
 `app/Actions/Reviews/CreateReviewAction.php`:
 
 ```php
@@ -1530,16 +1596,19 @@ use App\Council\Exceptions\InvalidJudgeOutputException;
 use App\Council\Exceptions\QuorumNotMetException;
 use App\Council\ReviewMode;
 use App\Council\ReviewRequest;
+use App\Http\Problems\ProblemType;
+use App\Http\ProblemDetails;
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Resources\ReviewResource;
 use App\Models\Review;
-use Illuminate\Http\JsonResponse;
+use Crell\ApiProblem\ApiProblem;
+use Illuminate\Http\Response;
 
 class CreateReviewAction
 {
     public function __construct(private CouncilOrchestrator $orchestrator) {}
 
-    public function __invoke(StoreReviewRequest $request): ReviewResource|JsonResponse
+    public function __invoke(StoreReviewRequest $request): ReviewResource|Response
     {
         $spec = (string) $request->string('spec');
         $mode = ReviewMode::from($request->input('mode', 'council'));
@@ -1547,21 +1616,37 @@ class CreateReviewAction
 
         try {
             $result = $this->orchestrator->review($spec, new ReviewRequest($mode));
-        } catch (QuorumNotMetException|InvalidJudgeOutputException $e) {
-            Review::create([
-                'spec_ref' => null,
-                'spec_hash' => $hash,
-                'mode' => $mode->value,
-                'dimension' => 'domain-modeling',
-                'panel_size' => 0,
-                'status' => 'error',
-                'error' => $e->getMessage(),
-            ]);
+        } catch (QuorumNotMetException $e) {
+            $this->persistError($hash, $mode, $e->getMessage());
 
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 422);
+            $problem = new ApiProblem('Council quorum not met', ProblemType::QUORUM_NOT_MET);
+            $problem->setDetail($e->getMessage());
+            $problem['failed_models'] = $e->deadModels;
+
+            return ProblemDetails::response($problem, 503);
+        } catch (InvalidJudgeOutputException $e) {
+            $this->persistError($hash, $mode, $e->getMessage());
+
+            $problem = new ApiProblem('Judge produced invalid output', ProblemType::JUDGE_OUTPUT_INVALID);
+            $problem->setDetail($e->getMessage());
+
+            return ProblemDetails::response($problem, 502);
         }
 
         return new ReviewResource(Review::fromResult($result, null, $hash));
+    }
+
+    private function persistError(string $hash, ReviewMode $mode, string $message): void
+    {
+        Review::create([
+            'spec_ref' => null,
+            'spec_hash' => $hash,
+            'mode' => $mode->value,
+            'dimension' => 'domain-modeling',
+            'panel_size' => 0,
+            'status' => 'error',
+            'error' => $message,
+        ]);
     }
 }
 ```

@@ -100,8 +100,9 @@ cutting `/v1`, `/v2` URL versions.
 Implemented with the **ADR pattern**: an invokable single-action controller
 (`app/Actions/Reviews/CreateReviewAction`) is the Action; an API Resource
 (`ReviewResource`) is the Responder. Accepts a spec + mode, calls the orchestrator,
-persists, returns JSON. Plain JSON, **no SSE** (SSE arrives in M1). This is the M0
-deliverable that establishes the REST-core shape.
+persists, returns JSON on success and **Problem Details (RFC 9457,
+`application/problem+json`)** on error (see Error handling). Plain JSON, **no SSE** (SSE
+arrives in M1). This is the M0 deliverable that establishes the REST-core shape.
 
 **Artisan command** `oast:review {spec} {--baseline}` — the experiment driver. Runs the
 orchestrator **live**, persists the result, prints findings + per-model latency to the
@@ -162,12 +163,19 @@ This seeds the M1+ persistence layer rather than being throwaway.
 
 ## Error handling
 
-| Failure | Behavior |
-|---|---|
-| Panelist call fails | Retry once; if still failing, count as lost. |
-| < 2 panelists succeed | Fail review (`QuorumNotMetException`) naming dead models; persist `status = error`. |
-| Judge output fails validation | One re-prompt with the validation error appended. |
-| Judge still invalid | Fail review (`InvalidJudgeOutputException`); persist `status = error`. |
+API errors are returned as **Problem Details (RFC 9457)** — `application/problem+json`
+via the `crell/api-problem` library, wrapped by a thin Laravel responder
+(`App\Http\ProblemDetails`). A small type taxonomy (`App\Http\Problems\ProblemType`)
+gives each failure a stable `type` URI. This dogfoods Dimension 6 (Error modeling) of the
+rubric. Status codes distinguish client faults (4xx) from upstream-model faults (5xx):
+
+| Failure | Behavior | HTTP |
+|---|---|---|
+| Panelist call fails | Retry once; if still failing, count as lost. | — (internal) |
+| Request validation (e.g. missing `spec`) | `ValidationException` rendered as problem+json (`errors` extension) for the api host. | `422` |
+| < 2 panelists succeed | `QuorumNotMetException` → problem+json (`failed_models` extension); persist `status = error`. | `503` |
+| Judge output fails validation | One re-prompt with the validation error appended. | — (internal) |
+| Judge still invalid | `InvalidJudgeOutputException` → problem+json; persist `status = error`. | `502` |
 
 ## Testing
 
@@ -211,4 +219,5 @@ a right answer to compare against).
 | Concurrency | Panel calls sequential in M0; concurrent fan-out is an M1 SSE-era concern. |
 | API surface | Served on the `api.*` subdomain (not `/api/` path). |
 | Entry-point pattern | ADR — invokable single-action controllers in `app/Actions`, API Resource as Responder. |
+| Error format | Problem Details (RFC 9457) via `crell/api-problem` + a thin Laravel responder; covers domain and validation errors. |
 | Code style | Pint PER preset via committed `pint.json`. |
