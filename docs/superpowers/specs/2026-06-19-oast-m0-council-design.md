@@ -164,10 +164,23 @@ This seeds the M1+ persistence layer rather than being throwaway.
 ## Error handling
 
 API errors are returned as **Problem Details (RFC 9457)** — `application/problem+json`
-via the `crell/api-problem` library, wrapped by a thin Laravel responder
-(`App\Http\ProblemDetails`). A small type taxonomy (`App\Http\Problems\ProblemType`)
-gives each failure a stable `type` URI. This dogfoods Dimension 6 (Error modeling) of the
-rubric. Status codes distinguish client faults (4xx) from upstream-model faults (5xx):
+built on the `crell/api-problem` library. The shape of the design:
+
+- **`App\Http\Problems\ProblemDetailsResponse implements Responsable`** — a small wrapper
+  around a Crell `ApiProblem` + status; `toResponse()` emits `application/problem+json`.
+  Because it's `Responsable`, an action can `return` it and Laravel renders it.
+- **`App\Http\Problems\ProvidesProblemDetails extends \Throwable`** — the contract every
+  domain exception implements: `toProblemDetails(): ProblemDetailsResponse`. The action
+  catches *this interface*, so adding a new error type needs no action change.
+- **Named domain exceptions with factory methods** — `QuorumNotMetException::forModels(...)`,
+  `InvalidJudgeOutputException::withErrors(...)` (private constructors). Each carries its
+  data and knows how to render itself via `toProblemDetails()`.
+- **`App\Http\Problems\ProblemType`** — stable `type` URI constants.
+- Request validation reuses the wrapper via `ProblemDetailsResponse::fromValidation()` in
+  the exception handler (scoped to the api host).
+
+This dogfoods Dimension 6 (Error modeling) of the rubric. Status codes distinguish client
+faults (4xx) from upstream-model faults (5xx):
 
 | Failure | Behavior | HTTP |
 |---|---|---|
@@ -219,5 +232,5 @@ a right answer to compare against).
 | Concurrency | Panel calls sequential in M0; concurrent fan-out is an M1 SSE-era concern. |
 | API surface | Served on the `api.*` subdomain (not `/api/` path). |
 | Entry-point pattern | ADR — invokable single-action controllers in `app/Actions`, API Resource as Responder. |
-| Error format | Problem Details (RFC 9457) via `crell/api-problem` + a thin Laravel responder; covers domain and validation errors. |
+| Error format | Problem Details (RFC 9457) via `crell/api-problem`. Named exceptions (factory methods) implement `ProvidesProblemDetails::toProblemDetails()`, returning a `Responsable` `ProblemDetailsResponse`; the action catches the interface. Covers domain + validation errors. |
 | Code style | Pint PER preset via committed `pint.json`. |

@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - PHP `^8.5`, Laravel `^13.8`, Pest `^4.7`. Add exactly two runtime dependencies: `laravel/ai` and `crell/api-problem`.
-- **API errors use Problem Details (RFC 9457)** — `application/problem+json` via the `crell/api-problem` library, wrapped by a thin Laravel responder (`App\Http\ProblemDetails`). This covers both domain failures and request-validation failures on the `api.*` subdomain.
+- **API errors use Problem Details (RFC 9457)** — `application/problem+json` built on `crell/api-problem`. Named domain exceptions (factory methods) implement `App\Http\Problems\ProvidesProblemDetails::toProblemDetails()`, returning a `Responsable` `App\Http\Problems\ProblemDetailsResponse`. Covers both domain failures and request-validation failures on the `api.*` subdomain.
 - **Models reach OpenRouter via the Laravel AI SDK's built-in `openrouter` provider** (`Lab::OpenRouter`), single key `OPENROUTER_API_KEY`. Panelist/judge model slugs come from `config/oast.php` and are passed as per-prompt `model:` overrides. (Native multi-provider is an M1 option.)
 - Tests run against in-memory SQLite (`phpunit.xml`); `RefreshDatabase` is auto-applied to `Feature` via `tests/Pest.php`. The `Unit` suite is bound to `Tests\TestCase` (Task 1) so SDK facades/helpers work there too.
 - **All LLM tests use the SDK's native fakes** (`PanelistAgent::fake()`, `JudgeAgent::fake()`) — no live calls in the default suite. Live tests are tagged `->group('live')` and excluded from `composer test`.
@@ -371,20 +371,81 @@ git commit -m "feat: add council value objects"
 
 ---
 
-### Task 3: Finding validator
+### Task 3: Finding validator & Problem Details foundation
+
+This task lays the **Problem Details (RFC 9457)** foundation — a `Responsable` wrapper and
+a `ProvidesProblemDetails` contract — then builds the first domain exception
+(`InvalidJudgeOutputException`) that implements it, plus the `FindingValidator`. Named
+exceptions are constructed via **factory methods** (private constructors) and render
+themselves via **`toProblemDetails()`**, keeping HTTP-shaping out of the action.
 
 **Files:**
-- Create: `app/Council/FindingValidator.php`
+- Create: `app/Http/Problems/ProblemType.php`
+- Create: `app/Http/Problems/ProblemDetailsResponse.php`
+- Create: `app/Http/Problems/ProvidesProblemDetails.php`
 - Create: `app/Council/Exceptions/InvalidJudgeOutputException.php`
+- Create: `app/Council/FindingValidator.php`
+- Test: `tests/Unit/Http/ProblemDetailsTest.php`
 - Test: `tests/Unit/Council/FindingValidatorTest.php`
 
 **Interfaces:**
-- Consumes: nothing.
+- Consumes: `Crell\ApiProblem\ApiProblem`, `Illuminate\Contracts\Support\Responsable`.
 - Produces:
-  - `App\Council\FindingValidator::validate(array $findings): array` — returns the findings on success; throws on any violation. The SDK's structured output already enforces enums/required fields at the provider layer; this validator is defense-in-depth **and** owns the conditional rule (`disagreement` required when `confidence = split`) that the schema marks optional.
-  - `App\Council\Exceptions\InvalidJudgeOutputException extends \RuntimeException` with public `array $errors`; `__construct(array $errors)`.
+  - `App\Http\Problems\ProblemType` — type-URI constants `VALIDATION`, `QUORUM_NOT_MET`, `JUDGE_OUTPUT_INVALID`.
+  - `App\Http\Problems\ProblemDetailsResponse implements Responsable` — `new ProblemDetailsResponse(ApiProblem $problem, int $status)`; static `fromValidation(ValidationException $e): self`; `toResponse($request): \Illuminate\Http\Response` emitting `application/problem+json`. The "simple wrapper" — returnable directly from an action (Laravel renders `Responsable`).
+  - `App\Http\Problems\ProvidesProblemDetails extends \Throwable` — `toProblemDetails(): ProblemDetailsResponse`. Implemented by every domain exception, so the action catches the *interface*.
+  - `App\Council\Exceptions\InvalidJudgeOutputException` — `implements ProvidesProblemDetails`, **private constructor**, factory `static withErrors(array $errors): self`, public readonly `array $errors`; `toProblemDetails()` → `502`.
+  - `App\Council\FindingValidator::validate(array $findings): array` — returns the findings on success; throws `InvalidJudgeOutputException::withErrors(...)` on any violation. The SDK's structured output enforces enums/required fields at the provider layer; this validator is defense-in-depth **and** owns the conditional rule (`disagreement` required when `confidence = split`) that the schema marks optional.
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing tests**
+
+`tests/Unit/Http/ProblemDetailsTest.php`:
+
+```php
+<?php
+
+use App\Council\Exceptions\InvalidJudgeOutputException;
+use App\Http\Problems\ProblemDetailsResponse;
+use App\Http\Problems\ProblemType;
+use Crell\ApiProblem\ApiProblem;
+use Illuminate\Validation\ValidationException;
+
+it('renders a problem details response as application/problem+json', function () {
+    $response = (new ProblemDetailsResponse(new ApiProblem('Boom', ProblemType::VALIDATION), 422))
+        ->toResponse(request());
+
+    expect($response->getStatusCode())->toBe(422)
+        ->and($response->headers->get('Content-Type'))->toBe('application/problem+json');
+
+    $body = json_decode($response->getContent(), true);
+    expect($body['type'])->toBe(ProblemType::VALIDATION)
+        ->and($body['status'])->toBe(422);
+});
+
+it('builds a validation problem from a ValidationException', function () {
+    $exception = ValidationException::withMessages(['spec' => ['The spec field is required.']]);
+
+    $response = ProblemDetailsResponse::fromValidation($exception)->toResponse(request());
+    $body = json_decode($response->getContent(), true);
+
+    expect($response->getStatusCode())->toBe(422)
+        ->and($body['type'])->toBe(ProblemType::VALIDATION)
+        ->and($body['errors']['spec'][0])->toContain('required');
+});
+
+it('renders the judge exception as a 502 problem details', function () {
+    $response = InvalidJudgeOutputException::withErrors(['0' => 'bad'])
+        ->toProblemDetails()
+        ->toResponse(request());
+
+    $body = json_decode($response->getContent(), true);
+
+    expect($response->getStatusCode())->toBe(502)
+        ->and($body['type'])->toBe(ProblemType::JUDGE_OUTPUT_INVALID);
+});
+```
+
+`tests/Unit/Council/FindingValidatorTest.php`:
 
 ```php
 <?php
@@ -444,12 +505,85 @@ it('exposes validation errors on the exception', function () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run tests to verify they fail**
 
-Run: `vendor/bin/pest tests/Unit/Council/FindingValidatorTest.php`
-Expected: FAIL — `Class "App\Council\FindingValidator" not found`.
+Run: `vendor/bin/pest tests/Unit/Http/ProblemDetailsTest.php tests/Unit/Council/FindingValidatorTest.php`
+Expected: FAIL — `Class "App\Http\Problems\ProblemType" not found`.
 
 - [ ] **Step 3: Write minimal implementation**
+
+`app/Http/Problems/ProblemType.php`:
+
+```php
+<?php
+
+namespace App\Http\Problems;
+
+final class ProblemType
+{
+    public const VALIDATION = 'https://oast.sh/problems/validation';
+
+    public const QUORUM_NOT_MET = 'https://oast.sh/problems/quorum-not-met';
+
+    public const JUDGE_OUTPUT_INVALID = 'https://oast.sh/problems/judge-output-invalid';
+}
+```
+
+`app/Http/Problems/ProblemDetailsResponse.php`:
+
+```php
+<?php
+
+namespace App\Http\Problems;
+
+use Crell\ApiProblem\ApiProblem;
+use Illuminate\Contracts\Support\Responsable;
+use Illuminate\Http\Response;
+use Illuminate\Validation\ValidationException;
+
+class ProblemDetailsResponse implements Responsable
+{
+    public function __construct(
+        private ApiProblem $problem,
+        private int $status,
+    ) {
+        $this->problem->setStatus($status);
+    }
+
+    public static function fromValidation(ValidationException $exception): self
+    {
+        $problem = new ApiProblem('Validation failed', ProblemType::VALIDATION);
+        $problem->setDetail('The request payload failed validation.');
+        $problem['errors'] = $exception->errors();
+
+        return new self($problem, 422);
+    }
+
+    public function toResponse($request): Response
+    {
+        return response(
+            $this->problem->asJson(),
+            $this->status,
+            ['Content-Type' => 'application/problem+json'],
+        );
+    }
+}
+```
+
+`app/Http/Problems/ProvidesProblemDetails.php`:
+
+```php
+<?php
+
+namespace App\Http\Problems;
+
+use Throwable;
+
+interface ProvidesProblemDetails extends Throwable
+{
+    public function toProblemDetails(): ProblemDetailsResponse;
+}
+```
 
 `app/Council/Exceptions/InvalidJudgeOutputException.php`:
 
@@ -458,13 +592,30 @@ Expected: FAIL — `Class "App\Council\FindingValidator" not found`.
 
 namespace App\Council\Exceptions;
 
+use App\Http\Problems\ProblemDetailsResponse;
+use App\Http\Problems\ProblemType;
+use App\Http\Problems\ProvidesProblemDetails;
+use Crell\ApiProblem\ApiProblem;
 use RuntimeException;
 
-class InvalidJudgeOutputException extends RuntimeException
+final class InvalidJudgeOutputException extends RuntimeException implements ProvidesProblemDetails
 {
-    public function __construct(public array $errors)
+    private function __construct(public readonly array $errors)
     {
-        parent::__construct('Judge output failed validation.');
+        parent::__construct('The judge produced output that failed validation.');
+    }
+
+    public static function withErrors(array $errors): self
+    {
+        return new self($errors);
+    }
+
+    public function toProblemDetails(): ProblemDetailsResponse
+    {
+        $problem = new ApiProblem('Judge produced invalid output', ProblemType::JUDGE_OUTPUT_INVALID);
+        $problem->setDetail($this->getMessage());
+
+        return new ProblemDetailsResponse($problem, 502);
     }
 }
 ```
@@ -485,7 +636,7 @@ class FindingValidator
     public function validate(array $findings): array
     {
         if ($findings === [] || ! array_is_list($findings)) {
-            throw new InvalidJudgeOutputException(['findings' => 'Expected a non-empty list of findings.']);
+            throw InvalidJudgeOutputException::withErrors(['findings' => 'Expected a non-empty list of findings.']);
         }
 
         foreach ($findings as $index => $finding) {
@@ -508,7 +659,7 @@ class FindingValidator
             );
 
             if ($validator->fails()) {
-                throw new InvalidJudgeOutputException([$index => $validator->errors()->toArray()]);
+                throw InvalidJudgeOutputException::withErrors([$index => $validator->errors()->toArray()]);
             }
         }
 
@@ -517,17 +668,17 @@ class FindingValidator
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 4: Run tests to verify they pass**
 
-Run: `vendor/bin/pest tests/Unit/Council/FindingValidatorTest.php`
-Expected: PASS (7 passed).
+Run: `vendor/bin/pest tests/Unit/Http/ProblemDetailsTest.php tests/Unit/Council/FindingValidatorTest.php`
+Expected: PASS (3 + 7 passed).
 
 - [ ] **Step 5: Format and commit**
 
 ```bash
-vendor/bin/pint app/Council
-git add app/Council tests/Unit/Council/FindingValidatorTest.php
-git commit -m "feat: add finding schema validator"
+vendor/bin/pint app/Http app/Council
+git add app/Http app/Council tests/Unit/Http/ProblemDetailsTest.php tests/Unit/Council/FindingValidatorTest.php
+git commit -m "feat: add Problem Details foundation and finding validator"
 ```
 
 ---
@@ -853,18 +1004,40 @@ Expected: FAIL — `Class "App\Council\CouncilOrchestrator" not found`.
 
 namespace App\Council\Exceptions;
 
+use App\Http\Problems\ProblemDetailsResponse;
+use App\Http\Problems\ProblemType;
+use App\Http\Problems\ProvidesProblemDetails;
+use Crell\ApiProblem\ApiProblem;
 use RuntimeException;
 
-class QuorumNotMetException extends RuntimeException
+final class QuorumNotMetException extends RuntimeException implements ProvidesProblemDetails
 {
-    public function __construct(
-        public array $deadModels,
-        int $succeeded,
-        int $required,
+    private function __construct(
+        public readonly array $deadModels,
+        public readonly int $succeeded,
+        public readonly int $required,
+        string $message,
     ) {
-        parent::__construct(
+        parent::__construct($message);
+    }
+
+    public static function forModels(array $deadModels, int $succeeded, int $required): self
+    {
+        return new self(
+            $deadModels,
+            $succeeded,
+            $required,
             "Quorum not met: {$succeeded} panelist(s) succeeded, {$required} required. Failed: ".implode(', ', $deadModels),
         );
+    }
+
+    public function toProblemDetails(): ProblemDetailsResponse
+    {
+        $problem = new ApiProblem('Council quorum not met', ProblemType::QUORUM_NOT_MET);
+        $problem->setDetail($this->getMessage());
+        $problem['failed_models'] = $this->deadModels;
+
+        return new ProblemDetailsResponse($problem, 503);
     }
 }
 ```
@@ -1037,7 +1210,7 @@ public function runJudge(string $spec, array $panelCritiques): array
         }
     }
 
-    throw new InvalidJudgeOutputException($lastErrors);
+    throw InvalidJudgeOutputException::withErrors($lastErrors);
 }
 ```
 
@@ -1143,7 +1316,7 @@ public function review(string $spec, ReviewRequest $request): ReviewResult
             fn (PanelResponse $r) => $r->model,
             array_filter($panel, fn (PanelResponse $r) => ! $r->ok),
         ));
-        throw new QuorumNotMetException($dead, count($ok), $this->config['quorum']);
+        throw QuorumNotMetException::forModels($dead, count($ok), $this->config['quorum']);
     }
 
     $critiques = array_map(fn (PanelResponse $r) => ['model' => $r->model, 'content' => $r->content], $ok);
@@ -1354,8 +1527,6 @@ git commit -m "feat: add reviews table and model"
 **Files:**
 - Create: `routes/api.php`
 - Create: `app/Http/Requests/StoreReviewRequest.php`
-- Create: `app/Http/Problems/ProblemType.php`
-- Create: `app/Http/ProblemDetails.php`
 - Create: `app/Actions/Reviews/CreateReviewAction.php`
 - Create: `app/Http/Resources/ReviewResource.php`
 - Modify: `bootstrap/app.php`
@@ -1363,13 +1534,12 @@ git commit -m "feat: add reviews table and model"
 - Test: `tests/Feature/ReviewEndpointTest.php`
 
 **Interfaces:**
-- Consumes: `CouncilOrchestrator`, `Review::fromResult`, domain exceptions, `config('oast.api_domain')`, `Crell\ApiProblem\ApiProblem`.
+- Consumes: `CouncilOrchestrator`, `Review::fromResult`, the `ProvidesProblemDetails` domain exceptions (Task 3 / Task 5), `ProblemDetailsResponse` (Task 3), `config('oast.api_domain')`.
 - Produces:
   - Route `POST /reviews` bound to the `api.*` subdomain, handled by the invokable `CreateReviewAction` (ADR action). Unversioned by path — the API evolves backwards-compatibly. Request body `{ "spec": "<raw spec>", "mode": "council|baseline" }` (mode optional, defaults `council`).
   - Success → `ReviewResource` (`200`, JSON under `data`).
-  - `App\Http\ProblemDetails::response(ApiProblem $problem, int $status, array $headers = []): \Illuminate\Http\Response` — sets the status on the problem and returns it as `application/problem+json`.
-  - `App\Http\Problems\ProblemType` — type-URI constants (`VALIDATION`, `QUORUM_NOT_MET`, `JUDGE_OUTPUT_INVALID`).
-  - Errors are **Problem Details (RFC 9457)**: request validation → `422` problem+json (rendered globally for the api host); `QuorumNotMetException` → `503` problem+json (+ `failed_models` extension) and a persisted `status = error` row; `InvalidJudgeOutputException` → `502` problem+json and a persisted error row.
+  - The action **catches the `ProvidesProblemDetails` interface** (not each concrete type), persists a `status = error` row, and returns `$e->toProblemDetails()` (a `Responsable`). `QuorumNotMetException` → `503` (+ `failed_models`), `InvalidJudgeOutputException` → `502`. Both render as `application/problem+json`.
+  - Request-validation failures (`ValidationException`) render as `422` problem+json globally, via `ProblemDetailsResponse::fromValidation()` in the exception handler (scoped to the api host).
 
 - [ ] **Step 1a: Add the `fakeCouncil()` helper to `tests/Pest.php`**
 
@@ -1463,11 +1633,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null; // fall through to default rendering off the API host
             }
 
-            $problem = new \Crell\ApiProblem\ApiProblem('Validation failed', \App\Http\Problems\ProblemType::VALIDATION);
-            $problem->setDetail('The request payload failed validation.');
-            $problem['errors'] = $e->errors();
-
-            return \App\Http\ProblemDetails::response($problem, 422);
+            return \App\Http\Problems\ProblemDetailsResponse::fromValidation($e)->toResponse($request);
         });
 
         $exceptions->shouldRenderJsonWhen(
@@ -1542,49 +1708,7 @@ class ReviewResource extends JsonResource
 }
 ```
 
-`app/Http/Problems/ProblemType.php` — the M0 problem-type taxonomy (URIs are identifiers, not necessarily dereferenceable yet):
-
-```php
-<?php
-
-namespace App\Http\Problems;
-
-final class ProblemType
-{
-    public const VALIDATION = 'https://oast.sh/problems/validation';
-
-    public const QUORUM_NOT_MET = 'https://oast.sh/problems/quorum-not-met';
-
-    public const JUDGE_OUTPUT_INVALID = 'https://oast.sh/problems/judge-output-invalid';
-}
-```
-
-`app/Http/ProblemDetails.php` — the thin Laravel responder bridging `crell/api-problem` to an HttpFoundation response:
-
-```php
-<?php
-
-namespace App\Http;
-
-use Crell\ApiProblem\ApiProblem;
-use Illuminate\Http\Response;
-
-final class ProblemDetails
-{
-    public static function response(ApiProblem $problem, int $status, array $headers = []): Response
-    {
-        $problem->setStatus($status);
-
-        return response(
-            $problem->asJson(),
-            $status,
-            array_merge(['Content-Type' => 'application/problem+json'], $headers),
-        );
-    }
-}
-```
-
-`app/Actions/Reviews/CreateReviewAction.php`:
+`app/Actions/Reviews/CreateReviewAction.php` — the action catches the `ProvidesProblemDetails` interface, persists the error row, and returns the exception's own `Responsable`:
 
 ```php
 <?php
@@ -1592,23 +1716,19 @@ final class ProblemDetails
 namespace App\Actions\Reviews;
 
 use App\Council\CouncilOrchestrator;
-use App\Council\Exceptions\InvalidJudgeOutputException;
-use App\Council\Exceptions\QuorumNotMetException;
 use App\Council\ReviewMode;
 use App\Council\ReviewRequest;
-use App\Http\Problems\ProblemType;
-use App\Http\ProblemDetails;
+use App\Http\Problems\ProblemDetailsResponse;
+use App\Http\Problems\ProvidesProblemDetails;
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Resources\ReviewResource;
 use App\Models\Review;
-use Crell\ApiProblem\ApiProblem;
-use Illuminate\Http\Response;
 
 class CreateReviewAction
 {
     public function __construct(private CouncilOrchestrator $orchestrator) {}
 
-    public function __invoke(StoreReviewRequest $request): ReviewResource|Response
+    public function __invoke(StoreReviewRequest $request): ReviewResource|ProblemDetailsResponse
     {
         $spec = (string) $request->string('spec');
         $mode = ReviewMode::from($request->input('mode', 'council'));
@@ -1616,21 +1736,10 @@ class CreateReviewAction
 
         try {
             $result = $this->orchestrator->review($spec, new ReviewRequest($mode));
-        } catch (QuorumNotMetException $e) {
+        } catch (ProvidesProblemDetails $e) {
             $this->persistError($hash, $mode, $e->getMessage());
 
-            $problem = new ApiProblem('Council quorum not met', ProblemType::QUORUM_NOT_MET);
-            $problem->setDetail($e->getMessage());
-            $problem['failed_models'] = $e->deadModels;
-
-            return ProblemDetails::response($problem, 503);
-        } catch (InvalidJudgeOutputException $e) {
-            $this->persistError($hash, $mode, $e->getMessage());
-
-            $problem = new ApiProblem('Judge produced invalid output', ProblemType::JUDGE_OUTPUT_INVALID);
-            $problem->setDetail($e->getMessage());
-
-            return ProblemDetails::response($problem, 502);
+            return $e->toProblemDetails();
         }
 
         return new ReviewResource(Review::fromResult($result, null, $hash));
