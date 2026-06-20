@@ -4,7 +4,7 @@
 
 **Goal:** Build the M0 "Council" — a Laravel review engine that fans out an OpenAPI spec to 3 LLM panelists via the Laravel AI SDK, has a dedicated judge organize their critiques into structured, validated findings, and exposes it via one HTTP endpoint (on an `api.*` subdomain) and one artisan command, with a single-model baseline mode for comparison.
 
-**Architecture:** One stateless engine (`CouncilOrchestrator`) is a pure-ish function `(spec, request) → ReviewResult` that performs no DB writes. Panelists and the judge are **Laravel AI SDK agents** (`PanelistAgent`, `JudgeAgent`), reaching models through OpenRouter (the SDK's built-in `openrouter` provider, single-key BYOK). Two thin entry points — an invokable Action behind `POST https://api.<domain>/v1/reviews` (ADR pattern) and the `oast:review` command — call the engine and own persistence to a `reviews` table.
+**Architecture:** One stateless engine (`CouncilOrchestrator`) is a pure-ish function `(spec, request) → ReviewResult` that performs no DB writes. Panelists and the judge are **Laravel AI SDK agents** (`PanelistAgent`, `JudgeAgent`), reaching models through OpenRouter (the SDK's built-in `openrouter` provider, single-key BYOK). Two thin entry points — an invokable Action behind `POST https://api.<domain>/reviews` (ADR pattern) and the `oast:review` command — call the engine and own persistence to a `reviews` table. (Endpoints are unversioned by path; the API evolves backwards-compatibly.)
 
 **Tech Stack:** PHP 8.5, Laravel 13, Laravel AI SDK (`laravel/ai`), Pest 4, SQLite, OpenRouter (via the SDK).
 
@@ -1347,7 +1347,7 @@ git commit -m "feat: add reviews table and model"
 
 ---
 
-### Task 9: API endpoint — `POST https://api.<domain>/v1/reviews` (ADR action)
+### Task 9: API endpoint — `POST https://api.<domain>/reviews` (ADR action)
 
 **Files:**
 - Create: `routes/api.php`
@@ -1361,7 +1361,7 @@ git commit -m "feat: add reviews table and model"
 **Interfaces:**
 - Consumes: `CouncilOrchestrator`, `Review::fromResult`, domain exceptions, `config('oast.api_domain')`.
 - Produces:
-  - Route `POST /v1/reviews` bound to the `api.*` subdomain, handled by the invokable `CreateReviewAction` (ADR action). Request body `{ "spec": "<raw spec>", "mode": "council|baseline" }` (mode optional, defaults `council`).
+  - Route `POST /reviews` bound to the `api.*` subdomain, handled by the invokable `CreateReviewAction` (ADR action). Unversioned by path — the API evolves backwards-compatibly. Request body `{ "spec": "<raw spec>", "mode": "council|baseline" }` (mode optional, defaults `council`).
   - Success → `ReviewResource` (`200`, JSON under `data`).
   - Domain failure → persisted `status = error` row + `422` JSON `{ status: "error", message }`.
 
@@ -1394,7 +1394,7 @@ beforeEach(fn () => config(['oast.api_domain' => 'api.oast.test']));
 it('runs a council review over http and persists it', function () {
     fakeCouncil();
 
-    $response = $this->postJson('http://api.oast.test/v1/reviews', [
+    $response = $this->postJson('http://api.oast.test/reviews', [
         'spec' => 'openapi: 3.1.0',
         'mode' => 'council',
     ]);
@@ -1408,7 +1408,7 @@ it('runs a council review over http and persists it', function () {
 });
 
 it('requires a spec', function () {
-    $this->postJson('http://api.oast.test/v1/reviews', ['mode' => 'council'])
+    $this->postJson('http://api.oast.test/reviews', ['mode' => 'council'])
         ->assertStatus(422)
         ->assertJsonValidationErrorFor('spec');
 });
@@ -1416,7 +1416,7 @@ it('requires a spec', function () {
 it('persists an error row and returns 422 when quorum is not met', function () {
     PanelistAgent::fake(fn () => throw new RuntimeException('down'));
 
-    $this->postJson('http://api.oast.test/v1/reviews', ['spec' => 'openapi: 3.1.0', 'mode' => 'council'])
+    $this->postJson('http://api.oast.test/reviews', ['spec' => 'openapi: 3.1.0', 'mode' => 'council'])
         ->assertStatus(422)
         ->assertJsonPath('status', 'error');
 
@@ -1431,7 +1431,7 @@ Expected: FAIL — 404 (route not registered) / class not found.
 
 - [ ] **Step 3: Write minimal implementation**
 
-Modify `bootstrap/app.php` — register API routes (no path prefix; the subdomain is applied in the route file) and JSON rendering for `v1/*`:
+Modify `bootstrap/app.php` — register API routes (no path prefix; the subdomain is applied in the route file) and force JSON rendering for any request on the `api.*` subdomain (there's no path prefix to key on anymore):
 
 ```php
 return Application::configure(basePath: dirname(__DIR__))
@@ -1447,7 +1447,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('v1/*'),
+            fn (Request $request) => $request->getHost() === config('oast.api_domain'),
         );
     })->create();
 ```
@@ -1461,7 +1461,7 @@ use App\Actions\Reviews\CreateReviewAction;
 use Illuminate\Support\Facades\Route;
 
 Route::domain(config('oast.api_domain'))->group(function () {
-    Route::post('/v1/reviews', CreateReviewAction::class);
+    Route::post('/reviews', CreateReviewAction::class);
 });
 ```
 
@@ -1576,7 +1576,7 @@ Expected: PASS (3 passed).
 ```bash
 vendor/bin/pint app/Actions app/Http routes/api.php bootstrap/app.php tests/Pest.php
 git add app/Actions app/Http routes/api.php bootstrap/app.php tests/Pest.php tests/Feature/ReviewEndpointTest.php
-git commit -m "feat: add POST /v1/reviews on api subdomain via ADR action"
+git commit -m "feat: add POST /reviews on api subdomain via ADR action"
 ```
 
 ---

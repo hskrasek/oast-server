@@ -39,7 +39,7 @@ outside) while giving M0 both an experiment driver and the REST-core deliverable
   artisan oast:review  ─┐                              PanelistAgent ×3  ┐
   (experiment driver)   ├─▶  CouncilOrchestrator  ─▶   (Laravel AI SDK)  ├─▶ OpenRouter
   CreateReviewAction   ─┘    (stateless engine)        JudgeAgent        ┘   (Lab::OpenRouter,
-  POST api.<domain>/v1/reviews     │                   (HasStructuredOutput)   BYOK 1 key)
+  POST api.<domain>/reviews        │                   (HasStructuredOutput)   BYOK 1 key)
         │                          ├─ panel fan-out (3 model overrides, sequential)
         │                          ├─ judge pass (1 dedicated model, structured output)
         │                          └─ returns ReviewResult
@@ -93,8 +93,10 @@ leaves the engine. Required fields and enums:
 }
 ```
 
-**API endpoint** `POST /v1/reviews`, served on the **`api.*` subdomain**
+**API endpoint** `POST /reviews`, served on the **`api.*` subdomain**
 (`config('oast.api_domain')`, e.g. `api.oast.test` locally), not an `/api/` path prefix.
+Endpoints are **unversioned by path** — the API evolves backwards-compatibly rather than
+cutting `/v1`, `/v2` URL versions.
 Implemented with the **ADR pattern**: an invokable single-action controller
 (`app/Actions/Reviews/CreateReviewAction`) is the Action; an API Resource
 (`ReviewResource`) is the Responder. Accepts a spec + mode, calls the orchestrator,
