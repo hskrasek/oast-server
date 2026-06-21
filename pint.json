@@ -1,7 +1,8 @@
 {
     "preset": "per",
     "notPath": [
-        "tests/TestCase.php"
+        "tests/TestCase.php",
+        "tmp"
     ],
     "rules": {
         "array_push": true,
@@ -40,7 +41,6 @@
                 "destruct",
                 "magic",
                 "phpunit",
-                "method:casts",
                 "method_abstract",
                 "method_public_static",
                 "method_public",

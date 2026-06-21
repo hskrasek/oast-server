@@ -3,14 +3,23 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
-        "dev": "vite"
+        "build": "vp build",
+        "dev": "vp dev",
+        "lint": "NODE_OPTIONS='--experimental-strip-types' vp fmt resources/",
+        "test:lint": "NODE_OPTIONS='--experimental-strip-types' vp fmt --check resources/"
     },
     "devDependencies": {
-        "@tailwindcss/vite": "^4.0.0",
-        "concurrently": "^9.0.1",
-        "laravel-vite-plugin": "^3.1",
-        "tailwindcss": "^4.0.0",
-        "vite": "^8.0.0"
+        "@tailwindcss/vite": "^4.2.2",
+        "concurrently": "^9.2.1",
+        "laravel-vite-plugin": "^3.0.1",
+        "npm-check-updates": "^21.0.2",
+        "playwright": "^1.59.1",
+        "tailwindcss": "^4.2.2",
+        "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+        "vite-plus": "latest"
+    },
+    "overrides": {
+        "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+        "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
     }
 }
