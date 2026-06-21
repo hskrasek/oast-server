@@ -7,6 +7,7 @@ namespace App\Council;
 use App\Ai\Agents\Judge;
 use App\Ai\Agents\Panelist;
 use App\Council\Exceptions\JudgeException;
+use App\Council\Exceptions\PanelException;
 use App\Council\Prompts\JudgePrompt;
 use App\Council\Prompts\PanelistPrompt;
 use Laravel\Ai\Enums\Lab;
@@ -68,6 +69,57 @@ final readonly class CouncilOrchestrator
         }
 
         throw JudgeException::invalidOutput($lastErrors);
+    }
+
+    public function review(string $spec, ReviewRequest $request): ReviewResult
+    {
+        $panel = $request->mode === ReviewMode::Baseline
+            ? $this->baselinePanel($spec)
+            : $this->deliberateOn($spec);
+
+        $ok = array_values(array_filter($panel, fn(PanelResponse $r): bool => $r->ok));
+
+        if ($request->mode === ReviewMode::Council && count($ok) < $this->config['quorum']) {
+            $dead = array_filter($panel, fn(PanelResponse $r): bool => !$r->ok)
+                    |> (fn($x): array => array_map(fn(PanelResponse $r): string => $r->model, $x, ))
+                    |> array_values(...);
+
+            throw PanelException::quorumNotMet($dead, count($ok), $this->config['quorum']);
+        }
+
+        $critiques = array_map(fn(PanelResponse $r): array => ['model' => $r->model, 'content' => $r->content], $ok);
+        $judge = $this->runJudge($spec, $critiques);
+
+        $metrics = array_map(fn(PanelResponse $r): array => ['model' => $r->model, 'ms' => $r->ms], $panel);
+        $metrics[] = ['model' => $this->config['judge'], 'ms' => $judge['ms']];
+
+        return new ReviewResult(
+            mode: $request->mode,
+            dimension: $request->dimension,
+            panelists: array_map(fn(PanelResponse $r): string => $r->model, $ok),
+            panelSize: count($ok),
+            rawPanelistResponses: array_map(fn(PanelResponse $r): array => [
+                'model' => $r->model,
+                'ok' => $r->ok,
+                'content' => $r->content,
+                'error' => $r->error,
+            ], $panel),
+            findings: $judge['findings'],
+            metrics: $metrics,
+            status: 'complete',
+        );
+    }
+
+    private function baselinePanel(string $spec): array
+    {
+        $model = $this->config['baseline'] ?? $this->config['panelists'][0];
+        $userPrompt = PanelistPrompt::userPrompt($spec);
+
+        return [
+            $this->promptPanelist($userPrompt, $model)
+            ?? $this->promptPanelist($userPrompt, $model)
+                ?? PanelResponse::failure($model, 'baseline call failed after retry'),
+        ];
     }
 
     private function promptPanelist(string $userPrompt, string $model): ?PanelResponse

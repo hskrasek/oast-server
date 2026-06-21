@@ -26,6 +26,7 @@ final class PanelException extends RuntimeException implements Responsable
         return new self(
             sprintf('Quorum not met: %d panelist(s) succeeded, %d required. Failed: ', $succeeded, $required) . implode(', ', $failedModels),
             503,
+            null,
             $failedModels,
         );
     }
