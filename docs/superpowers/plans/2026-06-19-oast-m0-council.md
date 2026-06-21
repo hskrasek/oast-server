@@ -42,6 +42,32 @@
 
 ---
 
+## Implementation status & deviations (built through Task 8)
+
+> **Tasks 1–8 are implemented, committed, and green (25 tests pass via `composer test`). Tasks 9–11 remain.**
+> The build took several deliberate liberties with the names/shapes written below. The **code is the
+> source of truth**; this plan is kept as-written for context and annotated here rather than rewritten.
+
+**Renames**
+- Agents: `PanelistAgent` → **`Panelist`**, `JudgeAgent` → **`Judge`** (`app/Ai/Agents/`). Both also `implements HasTools` with an empty `tools()` (the SDK's generated agent shape).
+- Exceptions: `QuorumNotMetException` → **`PanelException`** (factory `PanelException::quorumNotMet(...)`), `InvalidJudgeOutputException` → **`JudgeException`** (factory `JudgeException::invalidOutput(...)`).
+- Prompts: `PanelPrompt` → **`PanelistPrompt`**; resource `resources/prompts/panel.md` → **`panelist.md`**.
+- Orchestrator: `collectPanel()` → **`deliberateOn()`**; `PanelResponse::ok()/failed()` → **`success()/failure()`** (private constructor).
+- `ReviewResult` / `reviews` table: `panelModels` → **`panelists`**, `rawPanelResponses` → **`raw_panelist_responses`**. The `Review` model uses `$guarded = []` rather than `$fillable`.
+
+**Design simplification — Problem Details**
+- The planned `ProvidesProblemDetails` interface **and** `ProblemDetailsResponse` wrapper were dropped. Instead `PanelException`/`JudgeException` implement Laravel's `Responsable` directly and build their own `application/problem+json` in `toResponse()`, carrying the HTTP status (`503`/`502`) on the exception. Two fewer classes; Task 9 leans on this (the exceptions render themselves).
+- `App\Http\Problems\ProblemType` is a string-backed **enum** (`->value`), not a constants class.
+- `FindingValidator` is the shrunk version (only the `split`→`disagreement` rule), throwing `JudgeException::invalidOutput()`.
+
+**Tooling added beyond the plan** (commit `9844e09`)
+- PHPStan (`phpstan.neon.dist`), Rector (`rector.php`), `nunomaduro/essentials`, and an expanded `pint.json`. `declare(strict_types=1)` is now applied across the codebase, and the orchestrator uses PHP 8.5 syntax — the pipe operator `|>` and parens-free `new Judge()->prompt(...)`.
+
+**To fix before a live run**
+- `config/oast.php` panelist slug `'~anthropic/claude-sonnet-latest'` has a stray leading `~` (typo). All M0 slugs are placeholders to confirm before the first live run (build-spec Decision #4 fixture still open too).
+
+---
+
 ### Task 1: Project setup — deps, config, tooling
 
 **Files:**
@@ -206,7 +232,7 @@ git commit -m "chore: install Laravel AI SDK + api-problem, add oast config, ado
   - `App\Council\PanelResponse` readonly: `string $model, bool $ok, ?string $content, int $ms, ?string $error`; statics `PanelResponse::ok(string $model, string $content, int $ms): self` and `PanelResponse::failed(string $model, string $error): self`.
   - `App\Council\ReviewResult` readonly: `ReviewMode $mode, string $dimension, array $panelModels, int $panelSize, array $rawPanelResponses, array $findings, array $metrics, string $status`; `toArray(): array` (snake_case keys, `mode` as its value).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -254,12 +280,12 @@ it('serializes a review result to a snake_case array', function () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `vendor/bin/pest tests/Unit/Council/ValueObjectsTest.php`
 Expected: FAIL — `Class "App\Council\ReviewMode" not found`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `app/Council/ReviewMode.php`:
 
@@ -356,12 +382,12 @@ final readonly class ReviewResult
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `vendor/bin/pest tests/Unit/Council/ValueObjectsTest.php`
 Expected: PASS (3 passed).
 
-- [ ] **Step 5: Format and commit**
+- [x] **Step 5: Format and commit**
 
 ```bash
 vendor/bin/pint app/Council
@@ -397,7 +423,7 @@ themselves via **`toProblemDetails()`**, keeping HTTP-shaping out of the action.
   - `App\Council\Exceptions\InvalidJudgeOutputException` — `implements ProvidesProblemDetails`, **private constructor**, factory `static withErrors(array $errors): self`, public readonly `array $errors`; `toProblemDetails()` → `502`.
   - `App\Council\FindingValidator::validate(array $findings): array` — the `JudgeAgent`'s `HasStructuredOutput` schema already enforces enums and required fields at the provider layer, so this validator owns **only** the one rule JSON Schema can't express: `disagreement` is required when `confidence = split`. Returns the findings unchanged otherwise (an empty list is valid — a clean spec); throws `InvalidJudgeOutputException::withErrors(...)` when a split finding lacks `disagreement`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `tests/Unit/Http/ProblemDetailsTest.php`:
 
@@ -499,12 +525,12 @@ it('exposes validation errors on the exception', function () {
 > `JudgeAgent` schema enforces them at the provider layer. The validator's sole remaining
 > job is the conditional `disagreement`-when-`split` rule that JSON Schema can't express.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `vendor/bin/pest tests/Unit/Http/ProblemDetailsTest.php tests/Unit/Council/FindingValidatorTest.php`
 Expected: FAIL — `Class "App\Http\Problems\ProblemType" not found`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `app/Http/Problems/ProblemType.php`:
 
@@ -640,12 +666,12 @@ class FindingValidator
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `vendor/bin/pest tests/Unit/Http/ProblemDetailsTest.php tests/Unit/Council/FindingValidatorTest.php`
 Expected: PASS (3 + 5 passed).
 
-- [ ] **Step 5: Format and commit**
+- [x] **Step 5: Format and commit**
 
 ```bash
 vendor/bin/pint app/Http app/Council
@@ -674,7 +700,7 @@ git commit -m "feat: add Problem Details foundation and finding validator"
   - `App\Council\Prompts\PanelPrompt::userPrompt(string $spec): string`.
   - `App\Council\Prompts\JudgePrompt::userPrompt(string $spec, array $panelCritiques): string` where each critique is `['model' => string, 'content' => string]`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -709,12 +735,12 @@ it('builds a judge user prompt embedding spec and labeled critiques', function (
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `vendor/bin/pest tests/Unit/Council/AgentTest.php`
 Expected: FAIL — `Class "App\Ai\Agents\PanelistAgent" not found`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `resources/prompts/panel.md`:
 
@@ -855,14 +881,14 @@ class JudgePrompt
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `vendor/bin/pest tests/Unit/Council/AgentTest.php`
 Expected: PASS (4 passed).
 
 > If `app(JsonSchema::class)` does not resolve a builder directly, construct it however the installed SDK exposes its schema builder; the assertion only checks that `schema()` returns a `findings` key.
 
-- [ ] **Step 5: Format and commit**
+- [x] **Step 5: Format and commit**
 
 ```bash
 vendor/bin/pint app/Ai app/Council
@@ -887,7 +913,7 @@ git commit -m "feat: add panelist and judge agents with prompts"
   - `collectPanel(string $spec): array` — returns a list of `PanelResponse`, one per panelist, each retried once on failure, sequentially.
   - `App\Council\Exceptions\QuorumNotMetException extends \RuntimeException` with public `array $deadModels`; `__construct(array $deadModels, int $succeeded, int $required)`.
 
-- [ ] **Step 1a: Add the `orchestrator()` helper to `tests/Pest.php`**
+- [x] **Step 1a: Add the `orchestrator()` helper to `tests/Pest.php`**
 
 Append to `tests/Pest.php` (FQCN so no new `use` lines needed). Shared by Tasks 5, 6, 7.
 
@@ -907,7 +933,7 @@ function orchestrator(array $configOverrides = []): \App\Council\CouncilOrchestr
 }
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -962,12 +988,12 @@ it('marks a panelist failed when both attempts fail', function () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `vendor/bin/pest tests/Unit/Council/CollectPanelTest.php`
 Expected: FAIL — `Class "App\Council\CouncilOrchestrator" not found`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `app/Council/Exceptions/QuorumNotMetException.php`:
 
@@ -1070,12 +1096,12 @@ class CouncilOrchestrator
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `vendor/bin/pest tests/Unit/Council/CollectPanelTest.php`
 Expected: PASS (3 passed).
 
-- [ ] **Step 5: Format and commit**
+- [x] **Step 5: Format and commit**
 
 ```bash
 vendor/bin/pint app/Council tests/Pest.php
@@ -1096,7 +1122,7 @@ git commit -m "feat: add sequential panel collection with retry"
 - Produces:
   - `CouncilOrchestrator::runJudge(string $spec, array $panelCritiques): array` → `['findings' => array, 'ms' => int]`. Reads `$response['findings']`, validates, and on failure re-prompts the judge once with the validation error appended; throws `InvalidJudgeOutputException` if the second attempt also fails.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -1140,12 +1166,12 @@ it('throws when the judge is invalid twice', function () {
 })->throws(InvalidJudgeOutputException::class);
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `vendor/bin/pest tests/Unit/Council/RunJudgeTest.php`
 Expected: FAIL — `Call to undefined method ...::runJudge()`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add `use` lines to `app/Council/CouncilOrchestrator.php`:
 
@@ -1186,12 +1212,12 @@ public function runJudge(string $spec, array $panelCritiques): array
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `vendor/bin/pest tests/Unit/Council/RunJudgeTest.php`
 Expected: PASS (3 passed).
 
-- [ ] **Step 5: Format and commit**
+- [x] **Step 5: Format and commit**
 
 ```bash
 vendor/bin/pint app/Council
@@ -1216,7 +1242,7 @@ git commit -m "feat: add judge pass with structured output and retry"
   - `ReviewResult.rawPanelResponses` = list of `['model' => string, 'ok' => bool, 'content' => ?string, 'error' => ?string]`.
   - Container resolves `CouncilOrchestrator` with live `oast` config.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -1265,12 +1291,12 @@ it('resolves the orchestrator from the container', function () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `vendor/bin/pest tests/Unit/Council/ReviewTest.php`
 Expected: FAIL — `Call to undefined method ...::review()`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Add `use App\Council\Exceptions\QuorumNotMetException;` to `CouncilOrchestrator`, then add:
 
@@ -1339,12 +1365,12 @@ $this->app->singleton(\App\Council\CouncilOrchestrator::class, function ($app) {
 });
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `vendor/bin/pest tests/Unit/Council/ReviewTest.php`
 Expected: PASS (4 passed).
 
-- [ ] **Step 5: Format and commit**
+- [x] **Step 5: Format and commit**
 
 ```bash
 vendor/bin/pint app/Council app/Providers/AppServiceProvider.php
@@ -1366,7 +1392,7 @@ git commit -m "feat: wire council and baseline review modes"
 - Produces:
   - `App\Models\Review` with JSON-cast columns and `Review::fromResult(ReviewResult $result, ?string $specRef, string $specHash): self`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -1400,12 +1426,12 @@ it('persists a review result and casts json columns', function () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `vendor/bin/pest tests/Feature/ReviewModelTest.php`
 Expected: FAIL — `Class "App\Models\Review" not found`.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `database/migrations/2026_06_19_000001_create_reviews_table.php`:
 
@@ -1479,12 +1505,12 @@ class Review extends Model
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `vendor/bin/pest tests/Feature/ReviewModelTest.php`
 Expected: PASS (1 passed).
 
-- [ ] **Step 5: Format and commit**
+- [x] **Step 5: Format and commit**
 
 ```bash
 vendor/bin/pint app/Models
