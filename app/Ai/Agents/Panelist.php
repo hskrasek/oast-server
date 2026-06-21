@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Ai\Agents;
 
+use Illuminate\Support\Facades\File;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
@@ -18,7 +19,7 @@ final class Panelist implements Agent, HasTools
      */
     public function instructions(): string
     {
-        return file_get_contents(resource_path('prompts/panelist.md'));
+        return File::get(resource_path('prompts/panelist.md'));
     }
 
     /**

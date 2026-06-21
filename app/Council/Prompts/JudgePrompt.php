@@ -6,6 +6,9 @@ namespace App\Council\Prompts;
 
 final class JudgePrompt
 {
+    /**
+     * @param  list<array{model: string, content: string|null}>  $panelCritiques
+     */
     public static function userPrompt(string $spec, array $panelCritiques): string
     {
         $critiques = collect($panelCritiques)

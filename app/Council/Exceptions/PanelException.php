@@ -9,18 +9,25 @@ use Crell\ApiProblem\ApiProblem;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Response;
 use RuntimeException;
+use Throwable;
 
 final class PanelException extends RuntimeException implements Responsable
 {
+    /**
+     * @param  array<array-key, mixed>  $errors
+     */
     private function __construct(
-        protected $message,
-        protected $code = 0,
-        $previous = null,
+        string $message,
+        int $code,
+        ?Throwable $previous,
         public readonly array $errors = [],
     ) {
         parent::__construct($message, $code, $previous);
     }
 
+    /**
+     * @param  list<string>  $failedModels
+     */
     public static function quorumNotMet(array $failedModels, int $succeeded, int $required): self
     {
         return new self(
@@ -37,12 +44,12 @@ final class PanelException extends RuntimeException implements Responsable
             'Council quorum not met',
             ProblemType::QuorumNotMet->value,
         );
-        $problem->setDetail($this->message);
+        $problem->setDetail($this->getMessage());
         $problem['failed_models'] = $this->errors;
 
         return response(
             $problem->asJson(),
-            $this->code,
+            $this->getCode(),
             ['Content-Type' => 'application/problem+json'],
         );
     }

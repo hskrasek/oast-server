@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Ai\Agents;
 
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\File;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\HasStructuredOutput;
 use Laravel\Ai\Contracts\HasTools;
@@ -20,7 +21,7 @@ final class Judge implements Agent, HasStructuredOutput, HasTools
      */
     public function instructions(): string
     {
-        return file_get_contents(resource_path('prompts/judge.md'));
+        return File::get(resource_path('prompts/judge.md'));
     }
 
     /**

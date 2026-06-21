@@ -11,17 +11,21 @@ use App\Council\Exceptions\PanelException;
 use App\Council\Prompts\JudgePrompt;
 use App\Council\Prompts\PanelistPrompt;
 use Laravel\Ai\Enums\Lab;
+use Laravel\Ai\Responses\StructuredAgentResponse;
 use Throwable;
 
 final readonly class CouncilOrchestrator
 {
+    /**
+     * @param  array{panelists: list<string>, judge: string, baseline: string|null, quorum: int, timeout: int}  $config
+     */
     public function __construct(
         private FindingValidator $validator,
         private array            $config,
     ) {}
 
     /**
-     * @return PanelResponse[]
+     * @return list<PanelResponse>
      */
     public function deliberateOn(string $spec): array
     {
@@ -30,14 +34,20 @@ final readonly class CouncilOrchestrator
         $responses = [];
 
         foreach ($this->config['panelists'] as $panelist) {
-            $responses[] = $this->promptPanelist($userPrompt, $panelist)
-                ?? $this->promptPanelist($userPrompt, $panelist)
-                ?? PanelResponse::failure(model: $panelist, error: 'panel call failed after retry');
+            $response = $this->promptPanelist($userPrompt, $panelist)
+                ?? $this->promptPanelist($userPrompt, $panelist);
+
+            $responses[] = $response ?? PanelResponse::failure(model: $panelist, error: 'panel call failed after retry');
         }
 
         return $responses;
     }
 
+    /**
+     * @param  list<array{model: string, content: string|null}>  $panelCritiques
+     *
+     * @return array{findings: array<array-key, mixed>, ms: int}
+     */
     public function runJudge(string $spec, array $panelCritiques): array
     {
         $base = JudgePrompt::userPrompt($spec, $panelCritiques);
@@ -60,7 +70,10 @@ final readonly class CouncilOrchestrator
             $ms = (int) round((microtime(true) - $start) * 1000);
 
             try {
-                $findings = $this->validator->validate($response['findings'] ?? []);
+                $structured = $response instanceof StructuredAgentResponse ? $response->toArray() : [];
+                $rawFindings = is_array($structured['findings'] ?? null) ? $structured['findings'] : [];
+
+                $findings = $this->validator->validate($rawFindings);
 
                 return ['findings' => $findings, 'ms' => $ms];
             } catch (JudgeException $exception) {
@@ -110,15 +123,19 @@ final readonly class CouncilOrchestrator
         );
     }
 
+    /**
+     * @return list<PanelResponse>
+     */
     private function baselinePanel(string $spec): array
     {
         $model = $this->config['baseline'] ?? $this->config['panelists'][0];
         $userPrompt = PanelistPrompt::userPrompt($spec);
 
+        $response = $this->promptPanelist($userPrompt, $model)
+            ?? $this->promptPanelist($userPrompt, $model);
+
         return [
-            $this->promptPanelist($userPrompt, $model)
-            ?? $this->promptPanelist($userPrompt, $model)
-                ?? PanelResponse::failure($model, 'baseline call failed after retry'),
+            $response ?? PanelResponse::failure($model, 'baseline call failed after retry'),
         ];
     }
 

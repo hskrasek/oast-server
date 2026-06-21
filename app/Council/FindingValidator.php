@@ -6,23 +6,25 @@ namespace App\Council;
 
 use App\Council\Exceptions\JudgeException;
 
-/**
- * @phpstan-type Finding array{
- *     confidence?: string,
- *     disagreement?: string,
- * }
- */
 final class FindingValidator
 {
     /**
-     * @param array<array-key, Finding> $findings
+     * Validate the judge's raw (untrusted) findings, enforcing the one rule the
+     * structured-output schema cannot: a split finding must carry a disagreement.
      *
-     * @return array<array-key, Finding>
+     * @param  array<array-key, mixed>  $findings
+     *
+     * @return array<array-key, mixed>
+     *
      * @throws JudgeException
      */
     public function validate(array $findings): array
     {
         foreach ($findings as $index => $finding) {
+            if (! is_array($finding)) {
+                continue;
+            }
+
             if (($finding['confidence'] ?? null) === 'split' && blank($finding['disagreement'] ?? null)) {
                 throw JudgeException::invalidOutput([
                     $index => ['disagreement' => 'A split finding must have a disagreement'],
