@@ -10,9 +10,7 @@ use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\Response;
 use RuntimeException;
 
-use function response;
-
-final class JudgeException extends RuntimeException implements Responsable
+final class PanelException extends RuntimeException implements Responsable
 {
     private function __construct(
         protected $message,
@@ -23,19 +21,23 @@ final class JudgeException extends RuntimeException implements Responsable
         parent::__construct($message, $code, $previous);
     }
 
-    public static function invalidOutput(array $errors): self
+    public static function quorumNotMet(array $failedModels, int $succeeded, int $required): self
     {
-        return new self('The judge produced output that failed validation', 502, null, $errors);
+        return new self(
+            sprintf('Quorum not met: %d panelist(s) succeeded, %d required. Failed: ', $succeeded, $required) . implode(', ', $failedModels),
+            503,
+            $failedModels,
+        );
     }
 
     public function toResponse($request): Response
     {
         $problem = new ApiProblem(
-            $this->message,
-            ProblemType::InvalidJudgeOutput->value,
+            'Council quorum not met',
+            ProblemType::QuorumNotMet->value,
         );
-
-        $problem['errors'] = $this->errors;
+        $problem->setDetail($this->message);
+        $problem['failed_models'] = $this->errors;
 
         return response(
             $problem->asJson(),

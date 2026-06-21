@@ -31,9 +31,7 @@ pest()->extend(TestCase::class)
 |
 */
 
-expect()->extend('toBeOne', function () {
-    return $this->toBe(1);
-});
+expect()->extend('toBeOne', fn() => $this->toBe(1));
 
 /*
 |--------------------------------------------------------------------------
@@ -46,7 +44,16 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function orchestrator(array $configOverrides = []): App\Council\CouncilOrchestrator
 {
-    // ..
+    $config = array_merge([
+        'timeout' => 30,
+        'api_domain' => 'api.oast.test',
+        'panelists' => ['a/one', 'b/two', 'c/three'],
+        'judge' => 'judge/strong',
+        'baseline' => null,
+        'quorum' => 2,
+    ], $configOverrides);
+
+    return new App\Council\CouncilOrchestrator(new App\Council\FindingValidator, $config);
 }
