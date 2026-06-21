@@ -12,8 +12,11 @@ return new class extends AiMigration {
      */
     public function up(): void
     {
-        $conversationsTable = config('ai.conversations.tables.conversations', 'agent_conversations');
-        $messagesTable = config('ai.conversations.tables.messages', 'agent_conversation_messages');
+        $conversations = config('ai.conversations.tables.conversations', 'agent_conversations');
+        $conversationsTable = is_string($conversations) ? $conversations : 'agent_conversations';
+
+        $messages = config('ai.conversations.tables.messages', 'agent_conversation_messages');
+        $messagesTable = is_string($messages) ? $messages : 'agent_conversation_messages';
 
         Schema::create($conversationsTable, function (Blueprint $table): void {
             $table->string('id', 36)->primary();
@@ -48,7 +51,10 @@ return new class extends AiMigration {
      */
     public function down(): void
     {
-        Schema::dropIfExists(config('ai.conversations.tables.messages', 'agent_conversation_messages'));
-        Schema::dropIfExists(config('ai.conversations.tables.conversations', 'agent_conversations'));
+        $messages = config('ai.conversations.tables.messages', 'agent_conversation_messages');
+        $conversations = config('ai.conversations.tables.conversations', 'agent_conversations');
+
+        Schema::dropIfExists(is_string($messages) ? $messages : 'agent_conversation_messages');
+        Schema::dropIfExists(is_string($conversations) ? $conversations : 'agent_conversations');
     }
 };
