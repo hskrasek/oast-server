@@ -57,3 +57,17 @@ function orchestrator(array $configOverrides = []): App\Council\CouncilOrchestra
 
     return new App\Council\CouncilOrchestrator(new App\Council\FindingValidator, $config);
 }
+
+function validFinding(array $overrides = []): array
+{
+    return array_merge([
+        'dimension' => 'domain-modeling',
+        'title' => 'Order exposes DB join table',
+        'severity' => 'blocker',
+        'confidence' => 'consensus',
+        'location' => '#/paths/~1order_line_items',
+        'finding' => 'A join table is exposed as a resource.',
+        'why_it_matters' => 'Chains the public contract to the DB schema.',
+        'suggested_change' => 'Model orders and line items as domain resources.',
+    ], $overrides);
+}

@@ -4,12 +4,12 @@ use App\Council\PanelResponse;
 use App\Council\ReviewMode;
 use App\Council\ReviewResult;
 
-it('builds review mode from string', function () {
+it('builds review mode from string', function (): void {
     expect(ReviewMode::from('council'))->toBe(ReviewMode::Council)
         ->and(ReviewMode::from('baseline'))->toBe(ReviewMode::Baseline);
 });
 
-it('constructs ok and failed panel responses', function () {
+it('constructs ok and failed panel responses', function (): void {
     $ok = PanelResponse::success('openai/gpt', 'critique text', 1200);
     expect($ok->ok)->toBeTrue()
         ->and($ok->content)->toBe('critique text')
@@ -21,7 +21,7 @@ it('constructs ok and failed panel responses', function () {
         ->and($failed->error)->toBe('timeout');
 });
 
-it('serializes a review result to a snake_case array', function () {
+it('serializes a review result to a snake_case array', function (): void {
     $result = new ReviewResult(
         mode: ReviewMode::Council,
         dimension: 'domain-modeling',

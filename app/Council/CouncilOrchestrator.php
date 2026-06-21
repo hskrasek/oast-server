@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Council;
 
+use App\Ai\Agents\Judge;
 use App\Ai\Agents\Panelist;
+use App\Council\Exceptions\JudgeException;
+use App\Council\Prompts\JudgePrompt;
 use App\Council\Prompts\PanelistPrompt;
 use Laravel\Ai\Enums\Lab;
 use Throwable;
@@ -34,6 +37,39 @@ final readonly class CouncilOrchestrator
         return $responses;
     }
 
+    public function runJudge(string $spec, array $panelCritiques): array
+    {
+        $base = JudgePrompt::userPrompt($spec, $panelCritiques);
+        $lastErrors = [];
+
+        for ($attempts = 0; $attempts < 2; $attempts++) {
+            $prompt = $attempts === 0
+                ? $base
+                : $base . "\n\nYour previous response was invalid: " . json_encode($lastErrors)
+                . ". Return findings that satisfy every rule (a split finding MUST include `disagreement`).";
+
+            $start = microtime(true);
+
+            $response = new Judge()->prompt(
+                $prompt,
+                provider: Lab::OpenRouter,
+                model: $this->config['judge'],
+            );
+
+            $ms = (int) round((microtime(true) - $start) * 1000);
+
+            try {
+                $findings = $this->validator->validate($response['findings'] ?? []);
+
+                return ['findings' => $findings, 'ms' => $ms];
+            } catch (JudgeException $exception) {
+                $lastErrors[] = $exception->errors;
+            }
+        }
+
+        throw JudgeException::invalidOutput($lastErrors);
+    }
+
     private function promptPanelist(string $userPrompt, string $model): ?PanelResponse
     {
         $start = microtime(true);
@@ -51,6 +87,6 @@ final readonly class CouncilOrchestrator
 
         $ms = (int) round((microtime(true) - $start) * 1000);
 
-        return PanelResponse::success(model: $model, content: '', ms: $ms);
+        return PanelResponse::success(model: $model, content: $response->text, ms: $ms);
     }
 }
