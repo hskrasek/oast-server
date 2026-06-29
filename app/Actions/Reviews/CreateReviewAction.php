@@ -22,25 +22,25 @@ final readonly class CreateReviewAction
      * Review on success and throws the domain exception on failure — callers
      * (HTTP responder, CLI command) decide how to present either outcome.
      */
-    public function __invoke(string $spec, ReviewMode $mode): Review
+    public function __invoke(string $spec, ReviewMode $mode, ?string $specRef = null): Review
     {
         $specHash = hash('sha256', $spec);
 
         try {
             $result = $this->orchestrator->review($spec, new ReviewRequest($mode));
         } catch (PanelException|JudgeException $exception) {
-            $this->persistError($specHash, $mode, $exception->getMessage());
+            $this->persistError($specHash, $mode, $exception->getMessage(), $specRef);
 
             throw $exception;
         }
 
-        return Review::fromResult($result, null, $specHash);
+        return Review::fromResult($result, $specRef, $specHash);
     }
 
-    private function persistError(string $hash, ReviewMode $mode, string $message): void
+    private function persistError(string $hash, ReviewMode $mode, string $message, ?string $specRef): void
     {
         Review::create([
-            'spec_ref' => null,
+            'spec_ref' => $specRef,
             'spec_hash' => $hash,
             'mode' => $mode->value,
             'dimension' => 'domain-modeling',
