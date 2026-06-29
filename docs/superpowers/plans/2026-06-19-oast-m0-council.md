@@ -52,7 +52,9 @@
 - **Task 9** split into Action + Responder (the spec conflated them): `CreateReviewAction` is transport-agnostic — `__invoke(string $spec, ReviewMode $mode, ?string $specRef = null): Review`, persists an error row and **re-throws** on failure. `ReviewController` is the HTTP Responder (wraps the `Review` in `ReviewResource`); `StoreReviewRequest` validates; route on the `api.*` subdomain. Problem-details `status` member is set via `setStatus()` (was missing — caused a test failure). Validation errors map to `problem+json` in the `bootstrap/app.php` handler.
 - **Task 10** the `oast:review` command calls `CreateReviewAction` (not the orchestrator directly), so persistence + error handling are shared with HTTP — the payoff of the transport-agnostic action.
 - **Task 11** the live group is excluded via `--exclude-group=live` on `test:unit` **and** `test:type-coverage` (the user's pipeline replaced the old single `test` script).
-- **Still open:** `Responsable` on the exceptions is HTTP-in-the-domain — tracked as a memory TODO to move into the Responder/CLI boundary. Full `composer test` still gated on 100% line+type coverage (not yet met).
+- **Exceptions decoupled from HTTP (2026-06-21):** `PanelException`/`JudgeException` are now pure domain exceptions (no `Responsable`, no `problem+json`). HTTP mapping lives in `bootstrap/app.php` render callbacks (validation→422, quorum→503, judge→502) via the `App\Http\Problems\ProblemResponse` helper; the CLI catches them for exit codes.
+- **Still open:** full `composer test` is gated on 100% line+type coverage (not yet met).
+- The `~anthropic/claude-sonnet-latest` panelist slug is **intentional** (leading `~` selects the latest Sonnet version), not a typo.
 
 **Renames**
 - Agents: `PanelistAgent` → **`Panelist`**, `JudgeAgent` → **`Judge`** (`app/Ai/Agents/`). Both also `implements HasTools` with an empty `tools()` (the SDK's generated agent shape).

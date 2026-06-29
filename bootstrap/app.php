@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Council\Exceptions\JudgeException;
+use App\Council\Exceptions\PanelException;
+use App\Http\Problems\ProblemResponse;
 use App\Http\Problems\ProblemType;
 use Crell\ApiProblem\ApiProblem;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -22,23 +26,43 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->render(function (ValidationException $e, Request $request): Illuminate\Contracts\Routing\ResponseFactory|Illuminate\Http\Response|null {
-            if ($request->getHost() !== config('oast.api_domain')) {
+        // Map domain/validation failures to RFC 9457 problem+json on the API host.
+        $onApi = fn(Request $request): bool => $request->getHost() === config('oast.api_domain');
+
+        $exceptions->render(function (ValidationException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
                 return null;
             }
 
-            $problem = new ApiProblem(
-                'Validation failed',
-                ProblemType::Validation->value,
-            )->setStatus(422)->setDetail($e->getMessage());
-
+            $problem = new ApiProblem('Validation failed', ProblemType::Validation->value)
+                ->setDetail($e->getMessage());
             $problem['errors'] = $e->errors();
 
-            return response(
-                $problem->asJson(),
-                422,
-                ['Content-Type' => 'application/problem+json'],
-            );
+            return ProblemResponse::from($problem, 422);
+        });
+
+        $exceptions->render(function (PanelException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $problem = new ApiProblem('Council quorum not met', ProblemType::QuorumNotMet->value)
+                ->setDetail($e->getMessage());
+            $problem['failed_models'] = $e->failedModels;
+
+            return ProblemResponse::from($problem, 503);
+        });
+
+        $exceptions->render(function (JudgeException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $problem = new ApiProblem('Judge produced invalid output', ProblemType::InvalidJudgeOutput->value)
+                ->setDetail($e->getMessage());
+            $problem['errors'] = $e->errors;
+
+            return ProblemResponse::from($problem, 502);
         });
 
         $exceptions->shouldRenderJsonWhen(
