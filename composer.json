@@ -83,13 +83,13 @@
             "pint --parallel",
             "bun run lint"
         ],
-        "test:type-coverage": "pest --type-coverage --min=100",
+        "test:type-coverage": "pest --type-coverage --min=100 --exclude-group=live",
         "test:lint": [
             "pint --parallel --test",
             "rector --dry-run",
             "bun run test:lint"
         ],
-        "test:unit": "XDEBUG_MODE=\"coverage\" pest --parallel --coverage --exactly=100.0",
+        "test:unit": "XDEBUG_MODE=\"coverage\" pest --parallel --coverage --exactly=100.0 --exclude-group=live",
         "test:types": "phpstan --memory-limit=1G",
         "test": [
             "@test:type-coverage",
