@@ -42,11 +42,17 @@
 
 ---
 
-## Implementation status & deviations (built through Task 8)
+## Implementation status & deviations (M0 complete — Tasks 1–11)
 
-> **Tasks 1–8 are implemented, committed, and green (25 tests pass via `composer test`). Tasks 9–11 remain.**
+> **All 11 tasks are implemented; the faked suite is green (30 tests) and Pint / Rector / PHPStan (level max) pass.**
 > The build took several deliberate liberties with the names/shapes written below. The **code is the
 > source of truth**; this plan is kept as-written for context and annotated here rather than rewritten.
+
+**Tasks 9–11 actuals (ADR rework, 2026-06-21)**
+- **Task 9** split into Action + Responder (the spec conflated them): `CreateReviewAction` is transport-agnostic — `__invoke(string $spec, ReviewMode $mode, ?string $specRef = null): Review`, persists an error row and **re-throws** on failure. `ReviewController` is the HTTP Responder (wraps the `Review` in `ReviewResource`); `StoreReviewRequest` validates; route on the `api.*` subdomain. Problem-details `status` member is set via `setStatus()` (was missing — caused a test failure). Validation errors map to `problem+json` in the `bootstrap/app.php` handler.
+- **Task 10** the `oast:review` command calls `CreateReviewAction` (not the orchestrator directly), so persistence + error handling are shared with HTTP — the payoff of the transport-agnostic action.
+- **Task 11** the live group is excluded via `--exclude-group=live` on `test:unit` **and** `test:type-coverage` (the user's pipeline replaced the old single `test` script).
+- **Still open:** `Responsable` on the exceptions is HTTP-in-the-domain — tracked as a memory TODO to move into the Responder/CLI boundary. Full `composer test` still gated on 100% line+type coverage (not yet met).
 
 **Renames**
 - Agents: `PanelistAgent` → **`Panelist`**, `JudgeAgent` → **`Judge`** (`app/Ai/Agents/`). Both also `implements HasTools` with an empty `tools()` (the SDK's generated agent shape).
@@ -1539,7 +1545,7 @@ git commit -m "feat: add reviews table and model"
   - The action **catches the `ProvidesProblemDetails` interface** (not each concrete type), persists a `status = error` row, and returns `$e->toProblemDetails()` (a `Responsable`). `QuorumNotMetException` → `503` (+ `failed_models`), `InvalidJudgeOutputException` → `502`. Both render as `application/problem+json`.
   - Request-validation failures (`ValidationException`) render as `422` problem+json globally, via `ProblemDetailsResponse::fromValidation()` in the exception handler (scoped to the api host).
 
-- [ ] **Step 1a: Add the `fakeCouncil()` helper to `tests/Pest.php`**
+- [x] **Step 1a: Add the `fakeCouncil()` helper to `tests/Pest.php`**
 
 Append to `tests/Pest.php`. Fakes a full successful council/baseline flow for the **real** agents.
 
@@ -1553,7 +1559,7 @@ function fakeCouncil(): void
 
 > `validFinding()` is defined in `tests/Unit/Council/FindingValidatorTest.php` and is available across the suite. If you prefer, move `validFinding()` into `tests/Pest.php` so all helper data lives in one place.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -1603,12 +1609,12 @@ it('persists an error row and returns a 503 problem+json when quorum is not met'
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `vendor/bin/pest tests/Feature/ReviewEndpointTest.php`
 Expected: FAIL — 404 (route not registered) / class not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 Modify `bootstrap/app.php` — register API routes (no path prefix; the subdomain is applied in the route file) and force JSON rendering for any request on the `api.*` subdomain (there's no path prefix to key on anymore):
 
@@ -1758,12 +1764,12 @@ class CreateReviewAction
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `vendor/bin/pest tests/Feature/ReviewEndpointTest.php`
 Expected: PASS (3 passed).
 
-- [ ] **Step 5: Format and commit**
+- [x] **Step 5: Format and commit**
 
 ```bash
 vendor/bin/pint app/Actions app/Http routes/api.php bootstrap/app.php tests/Pest.php
@@ -1784,7 +1790,7 @@ git commit -m "feat: add POST /reviews on api subdomain via ADR action"
 - Produces:
   - `php artisan oast:review {spec : path to spec file} {--baseline}`. Reads the file, runs the orchestrator live, persists, prints a findings table. `--baseline` selects baseline mode. Returns `Command::FAILURE` (and persists an error row) on a missing file or domain exception.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```php
 <?php
@@ -1812,12 +1818,12 @@ it('fails when the spec file is missing', function () {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `vendor/bin/pest tests/Feature/ReviewCommandTest.php`
 Expected: FAIL — command `oast:review` not found.
 
-- [ ] **Step 3: Write minimal implementation**
+- [x] **Step 3: Write minimal implementation**
 
 `app/Console/Commands/ReviewCommand.php`:
 
@@ -1890,12 +1896,12 @@ class ReviewCommand extends Command
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `vendor/bin/pest tests/Feature/ReviewCommandTest.php`
 Expected: PASS (2 passed).
 
-- [ ] **Step 5: Format and commit**
+- [x] **Step 5: Format and commit**
 
 ```bash
 vendor/bin/pint app/Console
@@ -1915,7 +1921,7 @@ git commit -m "feat: add oast:review artisan command"
 - Consumes: the real orchestrator path and live OpenRouter (via the SDK).
 - Produces: a `live`-grouped test excluded from `composer test`, runnable via `vendor/bin/pest --group=live`.
 
-- [ ] **Step 1: Write the live test (no fakes)**
+- [x] **Step 1: Write the live test (no fakes)**
 
 ```php
 <?php
@@ -1944,7 +1950,7 @@ it('runs a real council review against OpenRouter', function () {
 })->group('live');
 ```
 
-- [ ] **Step 2: Exclude the live group from the default suite**
+- [x] **Step 2: Exclude the live group from the default suite**
 
 Change the `test` script in `composer.json`:
 
@@ -1955,17 +1961,17 @@ Change the `test` script in `composer.json`:
 ],
 ```
 
-- [ ] **Step 3: Run the default suite and confirm the live test does not execute**
+- [x] **Step 3: Run the default suite and confirm the live test does not execute**
 
 Run: `composer test`
 Expected: PASS; live test reported as not run (excluded). All faked tests pass.
 
-- [ ] **Step 4: (Manual, optional) Run the live test on demand**
+- [x] **Step 4: (Manual, optional) Run the live test on demand**
 
 Run: `vendor/bin/pest --group=live`
 Expected: With `OPENROUTER_API_KEY` set and valid model slugs, PASS with non-empty findings; otherwise SKIPPED.
 
-- [ ] **Step 5: Format and commit**
+- [x] **Step 5: Format and commit**
 
 ```bash
 vendor/bin/pint
@@ -1978,7 +1984,7 @@ git commit -m "test: add live council smoke test excluded from default suite"
 ## Final verification
 
 - [ ] Run the full default suite: `composer test` — all green, live excluded.
-- [ ] Run Pint (PER) across the project: `vendor/bin/pint --test` — no style violations.
+- [x] Run Pint (PER) across the project: `vendor/bin/pint --test` — no style violations.
 - [ ] Confirm the two flagged SDK details (per-call usage/cost accessor; structured-output fake API) against the installed `laravel/ai` version; wire per-model token/cost into `metrics` if available.
 - [ ] Confirm the M0 fixture decision (build-spec Decision #4) and set valid OpenRouter model slugs in `config/oast.php` before the first `vendor/bin/pest --group=live` run.
-- [ ] Update `AGENTS.md`: note the `pint.json` PER preset (the file currently says "no `pint.json`, default preset") and the Laravel AI SDK / OpenRouter provider setup.
+- [x] Update `AGENTS.md`: note the `pint.json` PER preset (the file currently says "no `pint.json`, default preset") and the Laravel AI SDK / OpenRouter provider setup.
