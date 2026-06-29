@@ -11,7 +11,7 @@ it('collects all three panelists on the happy path', function () {
     $responses = orchestrator()->deliberateOn('SPEC');
 
     expect($responses)->toHaveCount(3)
-        ->and(collect($responses)->every(fn (PanelResponse $r) => $r->ok))->toBeTrue();
+        ->and(collect($responses)->every(fn(PanelResponse $r) => $r->ok))->toBeTrue();
 });
 
 it('retries a failed panelist once and succeeds on retry', function () {
@@ -27,7 +27,7 @@ it('retries a failed panelist once and succeeds on retry', function () {
 
     $responses = orchestrator()->deliberateOn('SPEC');
 
-    expect(collect($responses)->every(fn (PanelResponse $r) => $r->ok))->toBeTrue()
+    expect(collect($responses)->every(fn(PanelResponse $r) => $r->ok))->toBeTrue()
         ->and($calls)->toBe(4); // 1 fail + 1 retry + 2 more panelists
 });
 
@@ -46,5 +46,5 @@ it('marks a panelist failed when both attempts fail', function () {
     $responses = collect(orchestrator()->deliberateOn('SPEC'));
 
     expect($responses->first()->ok)->toBeFalse()
-        ->and($responses->skip(1)->every(fn (PanelResponse $r) => $r->ok))->toBeTrue();
+        ->and($responses->skip(1)->every(fn(PanelResponse $r) => $r->ok))->toBeTrue();
 });

@@ -41,6 +41,7 @@ final class JudgeException extends RuntimeException implements Responsable
             $this->getMessage(),
             ProblemType::InvalidJudgeOutput->value,
         );
+        $problem->setStatus($this->getCode());
 
         $problem['errors'] = $this->errors;
 

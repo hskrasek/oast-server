@@ -44,6 +44,7 @@ final class PanelException extends RuntimeException implements Responsable
             'Council quorum not met',
             ProblemType::QuorumNotMet->value,
         );
+        $problem->setStatus($this->getCode());
         $problem->setDetail($this->getMessage());
         $problem['failed_models'] = $this->errors;
 

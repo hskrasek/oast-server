@@ -17,7 +17,7 @@ it('runs the judge and returns validated findings', function () {
         ->and($result['findings'][0]['severity'])->toBe('blocker')
         ->and($result['ms'])->toBeInt();
 
-    Judge::assertPrompted(fn ($prompt) => str_contains($prompt->prompt, 'crit'));
+    Judge::assertPrompted(fn($prompt) => str_contains($prompt->prompt, 'crit'));
 });
 
 it('re-prompts once when the first judge output is invalid, then succeeds', function () {

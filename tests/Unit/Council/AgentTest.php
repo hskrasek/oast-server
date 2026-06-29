@@ -7,17 +7,16 @@ use App\Ai\Agents\Judge;
 use App\Ai\Agents\Panelist;
 use App\Council\Prompts\JudgePrompt;
 use App\Council\Prompts\PanelistPrompt;
-use Illuminate\JsonSchema\JsonSchema;
 
 it('panelist instructions carry critique guidance but no rubric severities', function (): void {
     $instructions = new Panelist()->instructions();
 
-    expect(strtolower($instructions))->toContain('domain')
-        ->and(strtolower($instructions))->not->toContain('blocker'); // rubric not leaked to panel
+    expect(mb_strtolower($instructions))->toContain('domain')
+        ->and(mb_strtolower($instructions))->not->toContain('blocker'); // rubric not leaked to panel
 });
 
 it('judge schema defines a findings array with the required keys', function (): void {
-    $schema = new Judge()->schema(new \Illuminate\JsonSchema\JsonSchemaTypeFactory());
+    $schema = new Judge()->schema(new Illuminate\JsonSchema\JsonSchemaTypeFactory());
 
     expect($schema)->toHaveKey('findings');
 });

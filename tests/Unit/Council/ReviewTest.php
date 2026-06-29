@@ -23,7 +23,7 @@ it('produces a complete council review', function () {
 });
 
 it('fails the council review when quorum is not met', function () {
-    Panelist::fake(fn () => throw new RuntimeException('down')); // all panelists fail both attempts
+    Panelist::fake(fn() => throw new RuntimeException('down')); // all panelists fail both attempts
     Judge::fake();
 
     orchestrator()->review('SPEC', new ReviewRequest(ReviewMode::Council));

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Council\PanelResponse;
 use App\Council\ReviewMode;
 use App\Council\ReviewResult;

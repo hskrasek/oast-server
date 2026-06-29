@@ -71,3 +71,9 @@ function validFinding(array $overrides = []): array
         'suggested_change' => 'Model orders and line items as domain resources.',
     ], $overrides);
 }
+
+function fakeCouncil(): void
+{
+    App\Ai\Agents\Panelist::fake(['critique a', 'critique b', 'critique c']);
+    App\Ai\Agents\Judge::fake([['findings' => [validFinding()]]]);
+}
