@@ -178,9 +178,15 @@ If no, stop — cheap lesson.
 thin `reqwest` client that renders the stream — start with plain CI-style log output (simpler
 than the TUI). All three v0 dimensions (1, 2, 7). Per-run cost reporting.
 
-**M2 — TUI + interactive loop.** Rust TUI (ratatui) for the interactive experience; CLI
-`--ci` flag switches to non-interactive pipeline mode (exit codes on blocker findings → it's
-now a real CI gate). Apply/dismiss findings, re-review. Spectral sidecar lands here.
+**M2 — PR + CI surface (resequenced 2026-07-03; TUI deferred).** Meet users where design
+review actually happens: a GitHub Action that comments Council findings on spec PRs, plus
+**diff-scoped review** — review the spec *change*, not the whole spec (the recurring use
+case; whole-spec review is a one-shot audit). CLI `--ci` flag for non-interactive pipeline
+mode (exit codes on blocker findings). **Hard prerequisite for any CI gate: finding
+fingerprinting + a suppression/baseline file** (the `location` pointers carried since M0
+are the fingerprint input) — without it, non-deterministic reruns flake pipelines and the
+tool gets uninstalled. Spectral sidecar lands here. The ratatui TUI moves to the deferred
+rings (M5+); the M1 plain CLI output carries interactive use until then.
 
 **M3 — Web client.** Laravel-served frontend consuming the same SSE stream. The `location`
 pointers you've carried since M0 power an inline spec view. Self-host Docker image ships.
@@ -188,8 +194,9 @@ pointers you've carried since M0 power an inline spec view. Self-host Docker ima
 **M4 — Cloud.** `oast-cloud` overlay: auth, billing, managed keys. Hosted oast.sh goes live.
 BYOK-in-cloud as a follow-on.
 
-**M5+ — The deferred rings.** Greenfield/conversational mode, findings → spec diffs, domain
-profiles, then the git-native editor/collaboration platform that was the original vision.
+**M5+ — The deferred rings.** The ratatui TUI (interactive apply/dismiss/re-review loop),
+greenfield/conversational mode, findings → spec diffs, domain profiles, then the git-native
+editor/collaboration platform that was the original vision.
 
 ---
 
