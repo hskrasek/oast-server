@@ -93,10 +93,9 @@ final readonly class CouncilOrchestrator
         $ok = array_values(array_filter($panel, fn(PanelResponse $r): bool => $r->ok));
 
         if ($request->mode === ReviewMode::Council && count($ok) < $this->config['quorum']) {
-            $dead = array_values(array_map(
-                fn(PanelResponse $r): string => $r->model,
-                array_filter($panel, fn(PanelResponse $r): bool => ! $r->ok),
-            ));
+            $dead = array_filter($panel, fn(PanelResponse $r): bool => ! $r->ok)
+                |> (fn(array $failed): array => array_map(fn(PanelResponse $r): string => $r->model, $failed))
+                |> array_values(...);
 
             throw PanelException::quorumNotMet($dead, count($ok), $this->config['quorum']);
         }
