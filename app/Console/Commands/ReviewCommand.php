@@ -66,10 +66,8 @@ final class ReviewCommand extends Command
 
     private function cell(mixed $finding, string $key): string
     {
-        if (is_array($finding) && (is_string($finding[$key] ?? null) || is_numeric($finding[$key] ?? null))) {
-            return (string) $finding[$key];
-        }
+        $value = is_array($finding) ? ($finding[$key] ?? null) : null;
 
-        return '';
+        return is_string($value) || is_numeric($value) ? (string) $value : '';
     }
 }

@@ -41,6 +41,17 @@ it('produces a baseline review from a single model', function () {
         ->and($result->findings)->toHaveCount(1);
 });
 
+it('completes a baseline review even when the single panelist fails', function () {
+    Panelist::fake(fn() => throw new RuntimeException('down'));
+    Judge::fake([['findings' => [validFinding()]]]);
+
+    $result = orchestrator()->review('SPEC', new ReviewRequest(ReviewMode::Baseline));
+
+    expect($result->status)->toBe('complete')
+        ->and($result->mode)->toBe(ReviewMode::Baseline)
+        ->and($result->panelSize)->toBe(0);
+});
+
 it('resolves the orchestrator from the container', function () {
     expect(app(CouncilOrchestrator::class))->toBeInstanceOf(CouncilOrchestrator::class);
 });

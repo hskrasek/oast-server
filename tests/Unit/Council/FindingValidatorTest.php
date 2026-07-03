@@ -31,3 +31,9 @@ it('exposes validation errors on the exception', function (): void {
         expect($judgeException->errors)->toBeArray()->not->toBeEmpty();
     }
 });
+
+it('skips non-array findings', function (): void {
+    $findings = ['not-an-array', validFinding()];
+
+    expect((new FindingValidator)->validate($findings))->toBe($findings);
+});
