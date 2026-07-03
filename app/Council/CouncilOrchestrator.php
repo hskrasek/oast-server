@@ -65,6 +65,7 @@ final readonly class CouncilOrchestrator
                 $prompt,
                 provider: Lab::OpenRouter,
                 model: $this->config['judge'],
+                timeout: $this->config['timeout'],
             );
 
             $ms = (int) round((microtime(true) - $start) * 1000);
