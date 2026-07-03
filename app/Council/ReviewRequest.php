@@ -8,6 +8,6 @@ final readonly class ReviewRequest
 {
     public function __construct(
         public ReviewMode $mode,
-        public string $dimension = 'domain-modeling',
+        public Dimension $dimension = Dimension::DomainModeling,
     ) {}
 }

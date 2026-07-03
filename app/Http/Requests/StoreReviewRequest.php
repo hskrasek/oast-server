@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Council\Dimension;
 use App\Council\ReviewMode;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -29,6 +30,7 @@ final class StoreReviewRequest extends FormRequest
         return [
             'spec' => ['required', 'string'],
             'mode' => ['nullable', Rule::enum(ReviewMode::class)],
+            'dimension' => ['nullable', Rule::enum(Dimension::class)],
         ];
     }
 }

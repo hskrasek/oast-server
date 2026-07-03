@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Actions\Reviews\CreateReviewAction;
+use App\Council\Dimension;
 use App\Council\Exceptions\JudgeException;
 use App\Council\Exceptions\PanelException;
 use App\Council\ReviewMode;
@@ -15,7 +16,7 @@ use Override;
 final class ReviewCommand extends Command
 {
     #[Override]
-    protected $signature = 'oast:review {spec : Path to the OpenAPI spec file} {--baseline : Run a single-model baseline}';
+    protected $signature = 'oast:review {spec : Path to the OpenAPI spec file} {--baseline : Run a single-model baseline} {--dimension=domain-modeling : Review dimension (domain-modeling|workflows)}';
 
     #[Override]
     protected $description = 'Convene the Council on an OpenAPI spec (or a single-model baseline).';
@@ -31,11 +32,18 @@ final class ReviewCommand extends Command
         }
 
         $mode = $this->option('baseline') ? ReviewMode::Baseline : ReviewMode::Council;
+        $dimension = Dimension::tryFrom((string) $this->option('dimension'));
 
-        $this->info(sprintf('Convening %s review for %s ...', $mode->value, $path));
+        if (! $dimension instanceof Dimension) {
+            $this->error('Unknown dimension: ' . $this->option('dimension'));
+
+            return self::FAILURE;
+        }
+
+        $this->info(sprintf('Convening %s review (%s) for %s ...', $mode->value, $dimension->value, $path));
 
         try {
-            $result = $review(File::get($path), $mode, $path);
+            $result = $review(File::get($path), $mode, $path, $dimension);
         } catch (PanelException|JudgeException $exception) {
             $this->error($exception->getMessage());
 

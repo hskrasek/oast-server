@@ -26,6 +26,31 @@ it('fails when the spec file is missing', function (): void {
         ->assertFailed();
 });
 
+it('runs a review for the workflows dimension and persists it', function (): void {
+    fakeCouncil();
+    $path = sys_get_temp_dir() . '/oast-spec-' . uniqid() . '.yaml';
+    file_put_contents($path, 'openapi: 3.1.0');
+
+    $this->artisan('oast:review', ['spec' => $path, '--dimension' => 'workflows'])
+        ->assertSuccessful();
+
+    expect(Review::query()->where('dimension', 'workflows')->where('status', 'complete')->count())->toBe(1);
+
+    unlink($path);
+});
+
+it('fails on an unknown dimension without convening the panel', function (): void {
+    $path = sys_get_temp_dir() . '/oast-spec-' . uniqid() . '.yaml';
+    file_put_contents($path, 'openapi: 3.1.0');
+
+    $this->artisan('oast:review', ['spec' => $path, '--dimension' => 'vibes'])
+        ->assertFailed();
+
+    expect(Review::query()->count())->toBe(0);
+
+    unlink($path);
+});
+
 it('fails when the review cannot reach quorum', function (): void {
     Panelist::fake(fn() => throw new RuntimeException('down'));
     Judge::fake();

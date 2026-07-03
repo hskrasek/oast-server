@@ -27,15 +27,15 @@ final readonly class CouncilOrchestrator
     /**
      * @return list<PanelResponse>
      */
-    public function deliberateOn(string $spec): array
+    public function deliberateOn(string $spec, Dimension $dimension = Dimension::DomainModeling): array
     {
         $userPrompt = PanelistPrompt::userPrompt($spec);
 
         $responses = [];
 
         foreach ($this->config['panelists'] as $panelist) {
-            $response = $this->promptPanelist($userPrompt, $panelist)
-                ?? $this->promptPanelist($userPrompt, $panelist);
+            $response = $this->promptPanelist($userPrompt, $panelist, $dimension)
+                ?? $this->promptPanelist($userPrompt, $panelist, $dimension);
 
             $responses[] = $response ?? PanelResponse::failure(model: $panelist, error: 'panel call failed after retry');
         }
@@ -48,7 +48,7 @@ final readonly class CouncilOrchestrator
      *
      * @return array{findings: array<array-key, mixed>, ms: int}
      */
-    public function runJudge(string $spec, array $panelCritiques): array
+    public function runJudge(string $spec, array $panelCritiques, Dimension $dimension = Dimension::DomainModeling): array
     {
         $base = JudgePrompt::userPrompt($spec, $panelCritiques);
         $lastErrors = [];
@@ -61,7 +61,7 @@ final readonly class CouncilOrchestrator
 
             $start = microtime(true);
 
-            $response = new Judge()->prompt(
+            $response = new Judge($dimension)->prompt(
                 $prompt,
                 provider: Lab::OpenRouter,
                 model: $this->config['judge'],
@@ -88,8 +88,8 @@ final readonly class CouncilOrchestrator
     public function review(string $spec, ReviewRequest $request): ReviewResult
     {
         $panel = $request->mode === ReviewMode::Baseline
-            ? $this->baselinePanel($spec)
-            : $this->deliberateOn($spec);
+            ? $this->baselinePanel($spec, $request->dimension)
+            : $this->deliberateOn($spec, $request->dimension);
 
         $ok = array_values(array_filter($panel, fn(PanelResponse $r): bool => $r->ok));
 
@@ -102,14 +102,14 @@ final readonly class CouncilOrchestrator
         }
 
         $critiques = array_map(fn(PanelResponse $r): array => ['model' => $r->model, 'content' => $r->content], $ok);
-        $judge = $this->runJudge($spec, $critiques);
+        $judge = $this->runJudge($spec, $critiques, $request->dimension);
 
         $metrics = array_map(fn(PanelResponse $r): array => ['model' => $r->model, 'ms' => $r->ms], $panel);
         $metrics[] = ['model' => $this->config['judge'], 'ms' => $judge['ms']];
 
         return new ReviewResult(
             mode: $request->mode,
-            dimension: $request->dimension,
+            dimension: $request->dimension->value,
             panelists: array_map(fn(PanelResponse $r): string => $r->model, $ok),
             panelSize: count($ok),
             rawPanelistResponses: array_map(fn(PanelResponse $r): array => [
@@ -127,25 +127,25 @@ final readonly class CouncilOrchestrator
     /**
      * @return list<PanelResponse>
      */
-    private function baselinePanel(string $spec): array
+    private function baselinePanel(string $spec, Dimension $dimension): array
     {
         $model = $this->config['baseline'] ?? $this->config['panelists'][0];
         $userPrompt = PanelistPrompt::userPrompt($spec);
 
-        $response = $this->promptPanelist($userPrompt, $model)
-            ?? $this->promptPanelist($userPrompt, $model);
+        $response = $this->promptPanelist($userPrompt, $model, $dimension)
+            ?? $this->promptPanelist($userPrompt, $model, $dimension);
 
         return [
             $response ?? PanelResponse::failure($model, 'baseline call failed after retry'),
         ];
     }
 
-    private function promptPanelist(string $userPrompt, string $model): ?PanelResponse
+    private function promptPanelist(string $userPrompt, string $model, Dimension $dimension): ?PanelResponse
     {
         $start = microtime(true);
 
         try {
-            $response = new Panelist()->prompt(
+            $response = new Panelist($dimension)->prompt(
                 $userPrompt,
                 provider: Lab::OpenRouter,
                 model: $model,

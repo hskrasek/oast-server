@@ -15,6 +15,16 @@ it('panelist instructions carry critique guidance but no rubric severities', fun
         ->and(mb_strtolower($instructions))->not->toContain('blocker'); // rubric not leaked to panel
 });
 
+it('loads dimension-specific instructions for panelist and judge', function (): void {
+    $panelist = new Panelist(App\Council\Dimension::Workflows)->instructions();
+    $judge = new Judge(App\Council\Dimension::Workflows)->instructions();
+
+    expect(mb_strtolower($panelist))->toContain('long-running')
+        ->and(mb_strtolower($panelist))->not->toContain('blocker')
+        ->and($judge)->toContain('**workflows**')
+        ->and(new Judge()->instructions())->toContain('**domain-modeling**');
+});
+
 it('judge schema defines a findings array with the required keys', function (): void {
     $schema = new Judge()->schema(new Illuminate\JsonSchema\JsonSchemaTypeFactory());
 

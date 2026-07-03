@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Ai\Agents\Judge;
 use App\Ai\Agents\Panelist;
 use App\Council\CouncilOrchestrator;
+use App\Council\Dimension;
 use App\Council\Exceptions\PanelException;
 use App\Council\ReviewMode;
 use App\Council\ReviewRequest;
@@ -50,6 +51,16 @@ it('completes a baseline review even when the single panelist fails', function (
     expect($result->status)->toBe('complete')
         ->and($result->mode)->toBe(ReviewMode::Baseline)
         ->and($result->panelSize)->toBe(0);
+});
+
+it('threads the requested dimension through to the result', function () {
+    Panelist::fake(['c1', 'c2', 'c3']);
+    Judge::fake([['findings' => [validFinding(['dimension' => 'workflows'])]]]);
+
+    $result = orchestrator()->review('SPEC', new ReviewRequest(ReviewMode::Council, Dimension::Workflows));
+
+    expect($result->dimension)->toBe('workflows')
+        ->and($result->status)->toBe('complete');
 });
 
 it('resolves the orchestrator from the container', function () {

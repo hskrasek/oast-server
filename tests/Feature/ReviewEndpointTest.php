@@ -32,6 +32,29 @@ it('returns a problem+json validation error when spec is missing', function () {
         ->assertJsonPath('errors.spec.0', fn($msg) => filled($msg));
 });
 
+it('accepts a workflows dimension and persists it', function () {
+    fakeCouncil();
+
+    $this->postJson('http://api.oast.test/reviews', [
+        'spec' => 'openapi: 3.1.0',
+        'dimension' => 'workflows',
+    ])
+        ->assertCreated()
+        ->assertJsonPath('data.dimension', 'workflows');
+
+    expect(Review::where('dimension', 'workflows')->count())->toBe(1);
+});
+
+it('rejects an unknown dimension with a problem+json validation error', function () {
+    $this->postJson('http://api.oast.test/reviews', [
+        'spec' => 'openapi: 3.1.0',
+        'dimension' => 'vibes',
+    ])
+        ->assertStatus(422)
+        ->assertHeader('Content-Type', 'application/problem+json')
+        ->assertJsonPath('errors.dimension.0', fn($msg) => filled($msg));
+});
+
 it('persists an error row and returns a 503 problem+json when quorum is not met', function () {
     Panelist::fake(fn() => throw new RuntimeException('down'));
 
