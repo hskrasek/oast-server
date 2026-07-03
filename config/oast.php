@@ -13,7 +13,9 @@ return [
     'panelists' => [
         '~anthropic/claude-sonnet-latest',
         'openai/gpt-5.5',
-        'google/gemini-3.5-flash',
+        // GLM 5.2 over Gemini: flash-tier critiques ran shallow (9k chars in 15s),
+        // and the only frontier Gemini slug is a -preview; GLM adds real lineage diversity.
+        'z-ai/glm-5.2',
     ],
 
     // Dedicated strong judge — never a panelist.
