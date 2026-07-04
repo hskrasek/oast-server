@@ -6,6 +6,7 @@ namespace App\Ai;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 final class ModelPricing
 {
@@ -31,8 +32,24 @@ final class ModelPricing
      */
     private function rates(): array
     {
-        return Cache::remember('oast.model-pricing', now()->addDay(), function (): array {
-            $models = Http::get('https://openrouter.ai/api/v1/models')->json('data');
+        $failed = false;
+
+        $rates = Cache::remember('oast.model-pricing', now()->addDay(), function () use (&$failed): array {
+            try {
+                $response = Http::get('https://openrouter.ai/api/v1/models');
+            } catch (Throwable) {
+                $failed = true;
+
+                return [];
+            }
+
+            if ($response->failed()) {
+                $failed = true;
+
+                return [];
+            }
+
+            $models = $response->json('data');
             $rates = [];
 
             foreach (is_array($models) ? $models : [] as $model) {
@@ -59,5 +76,13 @@ final class ModelPricing
 
             return $rates;
         });
+
+        if ($failed) {
+            // Transient outage: don't let the empty result stand as a fresh
+            // 24h cache entry — a healthy retry should recover pricing immediately.
+            Cache::forget('oast.model-pricing');
+        }
+
+        return $rates;
     }
 }

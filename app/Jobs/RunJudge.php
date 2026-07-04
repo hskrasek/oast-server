@@ -14,6 +14,7 @@ use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use RuntimeException;
+use Throwable;
 
 final class RunJudge implements ShouldQueue
 {
@@ -76,7 +77,7 @@ final class RunJudge implements ShouldQueue
         $metrics = $panel->map(fn(ReviewPanelResponse $r): array => [
             'model' => $r->model, 'ms' => $r->ms, 'usage' => $r->usage, 'cost_usd' => $r->cost_usd,
         ])->all();
-        $metrics[] = ['model' => config('oast.judge'), 'ms' => $judge['ms'], 'usage' => $judge['usage'], 'cost_usd' => $judgeCost];
+        $metrics[] = ['model' => $judgeModel, 'ms' => $judge['ms'], 'usage' => $judge['usage'], 'cost_usd' => $judgeCost];
 
         $totalCost = collect($metrics)->sum(fn(array $m): float => (float) ($m['cost_usd'] ?? 0.0));
 
@@ -89,7 +90,7 @@ final class RunJudge implements ShouldQueue
         ]);
 
         $review->appendEvent('judge.done', [
-            'model' => config('oast.judge'),
+            'model' => $judgeModel,
             'ms' => $judge['ms'],
             'usage' => $judge['usage'],
             'cost_usd' => $judgeCost,
@@ -99,5 +100,20 @@ final class RunJudge implements ShouldQueue
             'findings' => $judge['findings'],
             'total_cost_usd' => $totalCost,
         ]);
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        $review = Review::query()->find($this->reviewId);
+
+        if ($review === null || $review->status !== 'judging') {
+            return;
+        }
+
+        $review->update(['status' => 'error']);
+        $review->appendEvent('review.failed', ['stage' => 'judge', 'problem' => [
+            'title' => 'Judge run failed',
+            'detail' => $exception?->getMessage() ?? 'judge job failed',
+        ]]);
     }
 }

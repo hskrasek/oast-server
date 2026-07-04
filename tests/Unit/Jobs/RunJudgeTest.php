@@ -68,3 +68,33 @@ it('throws when judge model configuration is missing', function (): void {
     expect(fn() => new RunJudge($review->id, Dimension::DomainModeling)->handle())
         ->toThrow(RuntimeException::class, 'Judge model configuration is missing or invalid.');
 });
+
+it('marks the review errored and records review.failed when the judge job fails', function (): void {
+    $review = reviewWithPanel(status: 'judging');
+
+    new RunJudge($review->id, Dimension::DomainModeling)->failed(new RuntimeException('boom'));
+
+    $review->refresh();
+    expect($review->status)->toBe('error')
+        ->and($review->events()->pluck('event')->all())->toBe(['review.failed'])
+        ->and($review->events()->sole()->data)->toBe([
+            'stage' => 'judge',
+            'problem' => ['title' => 'Judge run failed', 'detail' => 'boom'],
+        ]);
+});
+
+it('leaves a completed review untouched when the judge job fails afterward', function (): void {
+    $review = reviewWithPanel(status: 'complete');
+
+    new RunJudge($review->id, Dimension::DomainModeling)->failed(new RuntimeException('boom'));
+
+    $review->refresh();
+    expect($review->status)->toBe('complete')
+        ->and($review->events()->count())->toBe(0);
+});
+
+it('no-ops the failed hook when the review is missing', function (): void {
+    new RunJudge(9999, Dimension::DomainModeling)->failed(new RuntimeException('boom'));
+
+    expect(true)->toBeTrue();
+});
