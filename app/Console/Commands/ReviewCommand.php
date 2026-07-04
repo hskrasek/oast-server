@@ -16,7 +16,7 @@ use Override;
 final class ReviewCommand extends Command
 {
     #[Override]
-    protected $signature = 'oast:review {spec : Path to the OpenAPI spec file} {--baseline : Run a single-model baseline} {--dimension=domain-modeling : Review dimension (domain-modeling|workflows)}';
+    protected $signature = 'oast:review {spec : Path to the OpenAPI spec file} {--baseline : Run a single-model baseline} {--dimension=domain-modeling : Review dimension (domain-modeling|resource-relationships|workflows)}';
 
     #[Override]
     protected $description = 'Convene the Council on an OpenAPI spec (or a single-model baseline).';
