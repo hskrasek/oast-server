@@ -33,7 +33,6 @@ final readonly class ReviewResult
             'dimension' => $this->dimension,
             'panelists' => $this->panelists,
             'panel_size' => $this->panelSize,
-            'raw_panelist_responses' => $this->rawPanelistResponses,
             'findings' => $this->findings,
             'metrics' => $this->metrics,
             'status' => $this->status,
