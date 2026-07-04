@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Council\ReviewResult;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -27,14 +26,6 @@ final class Review extends Model
         'metrics' => 'array',
         'panel_size' => 'integer',
     ];
-
-    public static function fromResult(ReviewResult $result, ?string $specRef, string $specHash): self
-    {
-        return self::create(array_merge($result->toArray(), [
-            'spec_ref' => $specRef,
-            'spec_hash' => $specHash,
-        ]));
-    }
 
     /**
      * @return HasMany<ReviewEvent, $this>

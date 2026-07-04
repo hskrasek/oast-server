@@ -4,21 +4,29 @@ declare(strict_types=1);
 
 use App\Ai\Agents\Panelist;
 use App\Models\Review;
+use Illuminate\Support\Facades\Http;
 
-beforeEach(fn() => config(['oast.api_domain' => 'api.oast.test']));
+beforeEach(function (): void {
+    config(['oast.api_domain' => 'api.oast.test']);
+    Http::fake(['openrouter.ai/api/v1/models' => Http::response(['data' => []])]);
+});
 
 it('runs a council review over http and persists it', function () {
     fakeCouncil();
 
+    // QUEUE_CONNECTION=sync in the test environment runs the panel batch and
+    // judge job inline, so the DB row reaches 'complete' by the time this
+    // request returns — but the response reflects the review as it stood the
+    // moment CreateReviewAction dispatched the batch (async 202-shaped
+    // response arrives in Task 6).
     $response = $this->postJson('http://api.oast.test/reviews', [
         'spec' => 'openapi: 3.1.0',
         'mode' => 'council',
     ]);
 
     $response->assertCreated()
-        ->assertJsonPath('data.status', 'complete')
-        ->assertJsonPath('data.mode', 'council')
-        ->assertJsonCount(1, 'data.findings');
+        ->assertJsonPath('data.status', 'running')
+        ->assertJsonPath('data.mode', 'council');
 
     expect(Review::where('status', 'complete')->count())->toBe(1);
 });
@@ -55,14 +63,25 @@ it('rejects an unknown dimension with a problem+json validation error', function
         ->assertJsonPath('errors.dimension.0', fn($msg) => filled($msg));
 });
 
-it('persists an error row and returns a 503 problem+json when quorum is not met', function () {
+it('persists an error row when the panel cannot reach quorum', function () {
+    // The batch/finalizer pipeline owns quorum failure now: it marks the
+    // review row 'error' directly rather than throwing back to the HTTP
+    // layer, so the endpoint still responds 201 with the review as queued.
+    // The 503 problem+json surface returns in Task 6.
+    //
+    // Real queue connection (not sync): on the sync driver a failing job's
+    // exception re-propagates through Bus::batch()->dispatch() and crashes
+    // the request — that only happens because sync short-circuits the queue
+    // worker's isolation. A real deployment always queues, so exercise the
+    // failure path the way it actually runs.
+    config(['queue.default' => 'database']);
     Panelist::fake(fn() => throw new RuntimeException('down'));
 
     $this->postJson('http://api.oast.test/reviews', ['spec' => 'openapi: 3.1.0', 'mode' => 'council'])
-        ->assertStatus(503)
-        ->assertHeader('Content-Type', 'application/problem+json')
-        ->assertJsonPath('type', App\Http\Problems\ProblemType::QuorumNotMet)
-        ->assertJsonPath('status', 503);
+        ->assertCreated()
+        ->assertJsonPath('data.status', 'running');
+
+    $this->artisan('queue:work', ['--queue' => 'default', '--stop-when-empty' => true]);
 
     expect(Review::where('status', 'error')->count())->toBe(1);
 });

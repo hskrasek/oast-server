@@ -5,8 +5,13 @@ declare(strict_types=1);
 use App\Ai\Agents\Judge;
 use App\Ai\Agents\Panelist;
 use App\Models\Review;
+use Illuminate\Support\Facades\Http;
 
 // fakeCouncil() comes from tests/Pest.php.
+
+beforeEach(function (): void {
+    Http::fake(['openrouter.ai/api/v1/models' => Http::response(['data' => []])]);
+});
 
 it('runs a baseline review from a spec file and persists it', function (): void {
     fakeCouncil();
@@ -51,14 +56,27 @@ it('fails on an unknown dimension without convening the panel', function (): voi
     unlink($path);
 });
 
-it('fails when the review cannot reach quorum', function (): void {
+it('persists an error row when the review cannot reach quorum', function (): void {
+    // The command now just dispatches the batch (via CreateReviewAction) and
+    // returns — quorum failure is owned by the finalizer/DB row, not a thrown
+    // exception, so the command itself still succeeds. Real 202/async command
+    // semantics land in Task 7.
+    //
+    // Real queue connection (not sync): on the sync driver a failing job's
+    // exception re-propagates through Bus::batch()->dispatch() and crashes
+    // the command — that only happens because sync short-circuits the queue
+    // worker's isolation. A real deployment always queues, so exercise the
+    // failure path the way it actually runs.
+    config(['queue.default' => 'database']);
     Panelist::fake(fn() => throw new RuntimeException('down'));
     Judge::fake();
     $path = sys_get_temp_dir() . '/oast-spec-' . uniqid() . '.yaml';
     file_put_contents($path, 'openapi: 3.1.0');
 
     $this->artisan('oast:review', ['spec' => $path])
-        ->assertFailed();
+        ->assertSuccessful();
+
+    $this->artisan('queue:work', ['--queue' => 'default', '--stop-when-empty' => true]);
 
     expect(Review::query()->where('status', 'error')->count())->toBe(1);
 

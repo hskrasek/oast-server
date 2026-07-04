@@ -4,50 +4,72 @@ declare(strict_types=1);
 
 namespace App\Actions\Reviews;
 
-use App\Council\CouncilOrchestrator;
 use App\Council\Dimension;
-use App\Council\Exceptions\JudgeException;
-use App\Council\Exceptions\PanelException;
+use App\Council\PanelFinalizer;
 use App\Council\ReviewMode;
-use App\Council\ReviewRequest;
+use App\Jobs\RunPanelist;
 use App\Models\Review;
+use Illuminate\Bus\Batch;
+use Illuminate\Support\Facades\Bus;
 
 final readonly class CreateReviewAction
 {
-    public function __construct(
-        private CouncilOrchestrator $orchestrator,
-    ) {}
+    public function __invoke(
+        string $spec,
+        ReviewMode $mode,
+        ?string $specRef = null,
+        Dimension $dimension = Dimension::DomainModeling,
+    ): Review {
+        $panelists = $mode === ReviewMode::Baseline
+            ? [$this->baselineModel()]
+            : $this->panelistRoster();
 
-    /**
-     * Run a review and persist it. Transport-agnostic: returns the domain
-     * Review on success and throws the domain exception on failure — callers
-     * (HTTP responder, CLI command) decide how to present either outcome.
-     */
-    public function __invoke(string $spec, ReviewMode $mode, ?string $specRef = null, Dimension $dimension = Dimension::DomainModeling): Review
-    {
-        $specHash = hash('sha256', $spec);
-
-        try {
-            $result = $this->orchestrator->review($spec, new ReviewRequest($mode, $dimension));
-        } catch (PanelException|JudgeException $exception) {
-            $this->persistError($specHash, $mode, $dimension, $exception->getMessage(), $specRef);
-
-            throw $exception;
-        }
-
-        return Review::fromResult($result, $specRef, $specHash);
-    }
-
-    private function persistError(string $hash, ReviewMode $mode, Dimension $dimension, string $message, ?string $specRef): void
-    {
-        Review::create([
+        $review = Review::query()->create([
             'spec_ref' => $specRef,
-            'spec_hash' => $hash,
+            'spec_hash' => hash('sha256', $spec),
+            'spec' => $spec,
             'mode' => $mode->value,
             'dimension' => $dimension->value,
+            'panelists' => $panelists,
             'panel_size' => 0,
-            'status' => 'error',
-            'error' => $message,
+            'status' => 'running',
         ]);
+
+        $review->appendEvent('review.queued', [
+            'mode' => $mode->value,
+            'dimension' => $dimension->value,
+            'panelists' => $panelists,
+        ]);
+
+        $reviewId = $review->id;
+
+        Bus::batch(
+            collect($panelists)
+                ->map(fn(string $model): RunPanelist => new RunPanelist($reviewId, $model, $dimension))
+                ->all(),
+        )
+            ->name('review:' . $reviewId)
+            ->allowFailures()
+            ->finally(fn(Batch $batch) => new PanelFinalizer()->finalize($reviewId, $dimension))
+            ->dispatch();
+
+        return $review;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function panelistRoster(): array
+    {
+        $panelists = config('oast.panelists');
+
+        return is_array($panelists) ? array_values(array_filter($panelists, is_string(...))) : [];
+    }
+
+    private function baselineModel(): string
+    {
+        $baseline = config('oast.baseline');
+
+        return is_string($baseline) ? $baseline : ($this->panelistRoster()[0] ?? '');
     }
 }

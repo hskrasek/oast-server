@@ -6,8 +6,6 @@ namespace App\Console\Commands;
 
 use App\Actions\Reviews\CreateReviewAction;
 use App\Council\Dimension;
-use App\Council\Exceptions\JudgeException;
-use App\Council\Exceptions\PanelException;
 use App\Council\ReviewMode;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
@@ -42,40 +40,14 @@ final class ReviewCommand extends Command
 
         $this->info(sprintf('Convening %s review (%s) for %s ...', $mode->value, $dimension->value, $path));
 
-        try {
-            $result = $review(File::get($path), $mode, $path, $dimension);
-        } catch (PanelException|JudgeException $exception) {
-            $this->error($exception->getMessage());
+        // The panel/judge pipeline now runs as a dispatched job batch (Task 5)
+        // instead of synchronously in this call, so the review returned here
+        // is queued/running, not yet carrying findings. Live progress and a
+        // results view land with the async CLI rework in Task 7.
+        $result = $review(File::get($path), $mode, $path, $dimension);
 
-            return self::FAILURE;
-        }
-
-        $findings = $result->findings ?? [];
-
-        $this->table(
-            ['Severity', 'Confidence', 'Title', 'Location'],
-            array_map(fn(mixed $finding): array => [
-                $this->cell($finding, 'severity'),
-                $this->cell($finding, 'confidence'),
-                $this->cell($finding, 'title'),
-                $this->cell($finding, 'location'),
-            ], $findings),
-        );
-
-        $this->info(sprintf(
-            'Panel size: %d  |  Findings: %d  |  Review #%d',
-            $result->panel_size,
-            count($findings),
-            $result->id,
-        ));
+        $this->info(sprintf('Review #%d %s.', $result->id, $result->status));
 
         return self::SUCCESS;
-    }
-
-    private function cell(mixed $finding, string $key): string
-    {
-        $value = is_array($finding) ? ($finding[$key] ?? null) : null;
-
-        return is_string($value) || is_numeric($value) ? (string) $value : '';
     }
 }
