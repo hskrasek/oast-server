@@ -11,8 +11,8 @@ return new class extends Migration {
     {
         Schema::table('reviews', function (Blueprint $table): void {
             $table->longText('spec')->nullable();
-            $table->json('panel_models')->nullable();
             $table->string('status')->default('queued')->change();
+            $table->dropColumn('raw_panelist_responses');
         });
     }
 
@@ -20,7 +20,7 @@ return new class extends Migration {
     {
         Schema::table('reviews', function (Blueprint $table): void {
             $table->dropColumn('spec');
-            $table->dropColumn('panel_models');
+            $table->json('raw_panelist_responses')->nullable();
         });
     }
 };

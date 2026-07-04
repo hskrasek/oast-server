@@ -25,7 +25,6 @@ final class Review extends Model
         'panelists' => 'array',
         'findings' => 'array',
         'metrics' => 'array',
-        'panel_models' => 'array',
         'panel_size' => 'integer',
     ];
 

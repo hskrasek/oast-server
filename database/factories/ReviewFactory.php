@@ -25,7 +25,7 @@ final class ReviewFactory extends Factory
             'spec' => 'openapi: 3.1.0',
             'mode' => 'council',
             'dimension' => 'domain-modeling',
-            'panel_models' => [],
+            'panelists' => [],
             'panel_size' => 0,
             'status' => 'queued',
         ];
