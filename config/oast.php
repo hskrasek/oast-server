@@ -25,4 +25,7 @@ return [
     'baseline' => null,
 
     'quorum' => 2,
+
+    // Seconds to wait for a straggling panelist after quorum before the judge starts.
+    'quorum_grace' => (int) env('OAST_QUORUM_GRACE', 60),
 ];
