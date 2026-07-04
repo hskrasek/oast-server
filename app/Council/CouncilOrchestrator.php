@@ -11,6 +11,7 @@ use App\Council\Exceptions\PanelException;
 use App\Council\Prompts\JudgePrompt;
 use App\Council\Prompts\PanelistPrompt;
 use Laravel\Ai\Enums\Lab;
+use Laravel\Ai\Responses\Data\Usage;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use Throwable;
 
@@ -46,7 +47,7 @@ final readonly class CouncilOrchestrator
     /**
      * @param  list<array{model: string, content: string|null}>  $panelCritiques
      *
-     * @return array{findings: array<array-key, mixed>, ms: int}
+     * @return array{findings: array<array-key, mixed>, ms: int, usage: array<string, int>}
      */
     public function runJudge(string $spec, array $panelCritiques, Dimension $dimension = Dimension::DomainModeling): array
     {
@@ -76,7 +77,7 @@ final readonly class CouncilOrchestrator
 
                 $findings = $this->validator->validate($rawFindings);
 
-                return ['findings' => $findings, 'ms' => $ms];
+                return ['findings' => $findings, 'ms' => $ms, 'usage' => $this->usageMetrics($response->usage)];
             } catch (JudgeException $exception) {
                 $lastErrors[] = $exception->errors;
             }
@@ -104,8 +105,8 @@ final readonly class CouncilOrchestrator
         $critiques = array_map(fn(PanelResponse $r): array => ['model' => $r->model, 'content' => $r->content], $ok);
         $judge = $this->runJudge($spec, $critiques, $request->dimension);
 
-        $metrics = array_map(fn(PanelResponse $r): array => ['model' => $r->model, 'ms' => $r->ms], $panel);
-        $metrics[] = ['model' => $this->config['judge'], 'ms' => $judge['ms']];
+        $metrics = array_map(fn(PanelResponse $r): array => ['model' => $r->model, 'ms' => $r->ms, 'usage' => $r->usage], $panel);
+        $metrics[] = ['model' => $this->config['judge'], 'ms' => $judge['ms'], 'usage' => $judge['usage']];
 
         return new ReviewResult(
             mode: $request->mode,
@@ -122,6 +123,20 @@ final readonly class CouncilOrchestrator
             metrics: $metrics,
             status: 'complete',
         );
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    private function usageMetrics(Usage $usage): array
+    {
+        return [
+            'prompt_tokens' => $usage->promptTokens,
+            'completion_tokens' => $usage->completionTokens,
+            'cache_write_input_tokens' => $usage->cacheWriteInputTokens,
+            'cache_read_input_tokens' => $usage->cacheReadInputTokens,
+            'reasoning_tokens' => $usage->reasoningTokens,
+        ];
     }
 
     /**
@@ -157,6 +172,6 @@ final readonly class CouncilOrchestrator
 
         $ms = (int) round((microtime(true) - $start) * 1000);
 
-        return PanelResponse::success(model: $model, content: $response->text, ms: $ms);
+        return PanelResponse::success(model: $model, content: $response->text, ms: $ms, usage: $this->usageMetrics($response->usage));
     }
 }
