@@ -95,7 +95,11 @@ it('shows a review by id', function () {
         ->assertJsonPath('data.status', 'complete');
 });
 
-it('404s an unknown review id', function () {
+it('404s an unknown review id as problem+json', function () {
     $this->getJson("https://{$this->apiHost()}/reviews/999")
-        ->assertNotFound();
+        ->assertNotFound()
+        ->assertHeader('Content-Type', 'application/problem+json')
+        ->assertJsonPath('type', App\Http\Problems\ProblemType::NotFound)
+        ->assertJsonMissingPath('exception')
+        ->assertJsonMissingPath('trace');
 });

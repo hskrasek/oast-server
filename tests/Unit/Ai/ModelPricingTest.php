@@ -10,6 +10,7 @@ beforeEach(function (): void {
     Cache::flush();
     Http::fake([
         'openrouter.ai/api/v1/models' => Http::response(['data' => [
+            'not-a-model-row',
             ['id' => 'openai/gpt-5.5', 'pricing' => ['prompt' => '0.000002', 'completion' => '0.00001']],
             ['id' => 123, 'pricing' => ['prompt' => '0.000001', 'completion' => '0.000005']],
             ['pricing' => ['prompt' => '0.000001', 'completion' => '0.000005']],

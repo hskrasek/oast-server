@@ -39,12 +39,15 @@ final class ModelPricing
                 if (! is_array($model)) {
                     continue;
                 }
+
                 if (! is_string($model['id'] ?? null)) {
                     continue;
                 }
+
                 if (! is_array($model['pricing'] ?? null)) {
                     continue;
                 }
+
                 $prompt = $model['pricing']['prompt'];
                 $completion = $model['pricing']['completion'];
 

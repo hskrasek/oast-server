@@ -59,7 +59,11 @@ namespace {
 
     it('404s an unknown review as problem+json', function (): void {
         $this->get("https://{$this->apiHost()}/reviews/999/events")
-            ->assertNotFound();
+            ->assertNotFound()
+            ->assertHeader('Content-Type', 'application/problem+json')
+            ->assertJsonPath('type', App\Http\Problems\ProblemType::NotFound)
+            ->assertJsonMissingPath('exception')
+            ->assertJsonMissingPath('trace');
     });
 
     it('polls while the connection is open, then stops once it drops', function (): void {

@@ -31,7 +31,7 @@ final class RunPanelist implements ShouldQueue
 
     public static function quorumFor(Review $review): int
     {
-        return $review->mode === 'baseline' ? 1 : (int) config('oast.quorum');
+        return $review->mode === 'baseline' ? 1 : config()->integer('oast.quorum');
     }
 
     public function handle(): void
@@ -45,7 +45,7 @@ final class RunPanelist implements ShouldQueue
             PanelistPrompt::userPrompt((string) $review->spec),
             provider: Lab::OpenRouter,
             model: $this->model,
-            timeout: (int) config('oast.timeout'),
+            timeout: config()->integer('oast.timeout'),
         );
 
         $ms = (int) round((microtime(true) - $start) * 1000);
@@ -125,7 +125,7 @@ final class RunPanelist implements ShouldQueue
 
         if ($successes === self::quorumFor($review)) {
             RunJudge::dispatch($this->reviewId, $this->dimension)
-                ->delay((int) config('oast.quorum_grace'));
+                ->delay(config()->integer('oast.quorum_grace'));
         }
     }
 }

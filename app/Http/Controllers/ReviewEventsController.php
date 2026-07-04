@@ -50,7 +50,7 @@ final class ReviewEventsController
     {
         echo sprintf('id: %s%s', $event->id, PHP_EOL);
         echo sprintf('event: %s%s', $event->event, PHP_EOL);
-        echo 'data: ' . json_encode($event->data) . "\n\n";
+        echo sprintf('data: %s%s%s', json_encode($event->data), PHP_EOL, PHP_EOL);
 
         if (ob_get_level() > 0) {
             ob_flush();
