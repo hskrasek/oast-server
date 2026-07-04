@@ -45,7 +45,10 @@ return [
             'busy_timeout' => (int) env('DB_BUSY_TIMEOUT', 5000),
             'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'),
             'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'),
-            'transaction_mode' => 'DEFERRED',
+            // IMMEDIATE, not DEFERRED: queue workers reserve jobs inside a
+            // transaction; a DEFERRED read→write upgrade gets SQLITE_BUSY
+            // instantly (busy_timeout never applies to upgrade deadlocks).
+            'transaction_mode' => env('DB_TRANSACTION_MODE', 'IMMEDIATE'),
         ],
 
         'mysql' => [

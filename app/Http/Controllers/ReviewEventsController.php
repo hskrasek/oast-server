@@ -19,6 +19,10 @@ final class ReviewEventsController
         $lastId = (int) ($request->headers->get('Last-Event-ID') ?? $request->query('lastEventId', '0'));
 
         return response()->stream(function () use ($review, $lastId): void {
+            // A review runs for minutes; the default max_execution_time (30s)
+            // would fatal mid-stream and force clients into reconnect churn.
+            set_time_limit(0);
+
             $cursor = $lastId;
 
             while (true) {
