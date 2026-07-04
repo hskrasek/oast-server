@@ -6,9 +6,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Override;
 
 final class ReviewPanelResponse extends Model
 {
+    #[Override]
     protected $fillable = ['model', 'ok', 'content', 'error', 'ms', 'usage', 'cost_usd', 'late'];
 
     /**

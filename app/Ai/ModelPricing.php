@@ -36,10 +36,15 @@ final class ModelPricing
             $rates = [];
 
             foreach (is_array($models) ? $models : [] as $model) {
-                if (! is_array($model) || ! is_string($model['id'] ?? null) || ! is_array($model['pricing'] ?? null)) {
+                if (! is_array($model)) {
                     continue;
                 }
-
+                if (! is_string($model['id'] ?? null)) {
+                    continue;
+                }
+                if (! is_array($model['pricing'] ?? null)) {
+                    continue;
+                }
                 $prompt = $model['pricing']['prompt'];
                 $completion = $model['pricing']['completion'];
 

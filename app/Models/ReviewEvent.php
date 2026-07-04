@@ -6,11 +6,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Override;
 
 final class ReviewEvent extends Model
 {
     public const null UPDATED_AT = null;
 
+    #[Override]
     protected $fillable = ['event', 'data'];
 
     /**

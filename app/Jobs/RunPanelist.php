@@ -49,7 +49,7 @@ final class RunPanelist implements ShouldQueue
         );
 
         $ms = (int) round((microtime(true) - $start) * 1000);
-        $usage = self::usageMetrics($response->usage);
+        $usage = $this->usageMetrics($response->usage);
         $late = in_array($review->refresh()->status, ['judging', 'complete', 'error'], true);
 
         $review->panelResponses()->create([
@@ -102,7 +102,7 @@ final class RunPanelist implements ShouldQueue
     /**
      * @return array<string, int>
      */
-    private static function usageMetrics(Usage $usage): array
+    private function usageMetrics(Usage $usage): array
     {
         return [
             'prompt_tokens' => $usage->promptTokens,

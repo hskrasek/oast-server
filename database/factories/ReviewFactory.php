@@ -6,12 +6,14 @@ namespace Database\Factories;
 
 use App\Models\Review;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Override;
 
 /**
  * @extends Factory<Review>
  */
 final class ReviewFactory extends Factory
 {
+    #[Override]
     protected $model = Review::class;
 
     /**

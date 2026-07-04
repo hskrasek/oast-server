@@ -41,6 +41,7 @@ final class RunJudge implements ShouldQueue
         $panel = $review->panelResponses()->where('ok', true)->where('late', false)->get();
         $oastConfig = config('oast');
         $oastConfig = is_array($oastConfig) ? $oastConfig : [];
+
         $judgeModel = is_string($oastConfig['judge'] ?? null) ? $oastConfig['judge'] : '';
         if ($judgeModel === '') {
             throw new RuntimeException('Judge model configuration is missing or invalid.');
@@ -60,11 +61,11 @@ final class RunJudge implements ShouldQueue
 
         try {
             $judge = $orchestrator->runJudge((string) $review->spec, $critiques, $this->dimension);
-        } catch (JudgeException $exception) {
+        } catch (JudgeException $judgeException) {
             $review->update(['status' => 'error']);
             $review->appendEvent('review.failed', ['stage' => 'judge', 'problem' => [
                 'title' => 'Judge produced invalid output',
-                'detail' => $exception->getMessage(),
+                'detail' => $judgeException->getMessage(),
             ]]);
 
             return;
