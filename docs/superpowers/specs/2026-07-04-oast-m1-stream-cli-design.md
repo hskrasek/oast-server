@@ -54,7 +54,9 @@ artisan oast:review ─┘                        │
 
 ## Data model
 
-- `reviews.status`: `queued | running | judging | complete | error`.
+- `reviews.status`: `running | judging | complete | error`. *(As built: the review is
+  created `running` — the batch dispatches in the same request, and the `RunJudge` CAS
+  keys on `running`, so a distinct `queued` state never materializes.)*
 - **`review_events`** (new): `id` (autoincrement; doubles as SSE event id), `review_id`,
   `event` (string), `data` (JSON), `created_at`. Append-only. Index `(review_id, id)`.
 - **`review_panel_responses`** (new): `review_id`, `model`, `ok` (bool), `content`
@@ -154,8 +156,11 @@ published as its own public repo). Rust 2024 edition.
 - Flow: read spec file → `POST {server}/reviews` → follow
   `GET /reviews/{id}/events` as an SSE stream → print a CI-style line per event →
   findings table (or raw JSON with `--json`) on completion.
-- Exit codes: **0** complete without blockers, **1** blockers present, **2** transport/
-  server/review error.
+- Exit codes: **0** complete without blockers, **1** blockers present **or the review
+  itself failed** (`review.failed` — quorum miss / judge failure), **2** transport/
+  server/argument error. *(As built: CI treats "spec has blockers" and "review infra
+  died" identically at exit-code level; M2's `--ci` contract should split these if
+  pipelines need to distinguish them.)*
 - Stack: `clap` (derive), blocking `reqwest`, hand-rolled SSE parser (~50 lines:
   `id:`/`event:`/`data:`/blank-line framing), `serde`/`serde_json`. Reconnect with
   `Last-Event-ID` on dropped connections (bounded retries).

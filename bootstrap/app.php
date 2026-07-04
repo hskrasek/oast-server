@@ -13,6 +13,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -63,6 +64,20 @@ return Application::configure(basePath: dirname(__DIR__))
             $problem['errors'] = $e->errors;
 
             return ProblemResponse::from($problem, 502);
+        });
+
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            // Deliberately generic: the underlying exception message (e.g. a
+            // ModelNotFoundException's "No query results for model [...] 999")
+            // is an implementation detail, not something to leak to API callers.
+            $problem = new ApiProblem('Not Found', ProblemType::NotFound->value)
+                ->setDetail('The requested resource could not be found.');
+
+            return ProblemResponse::from($problem, 404);
         });
 
         $exceptions->shouldRenderJsonWhen(

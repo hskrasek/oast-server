@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Council\CouncilOrchestrator;
+use App\Actions\Reviews\CreateReviewAction;
 use App\Council\ReviewMode;
-use App\Council\ReviewRequest;
 
 it('runs a real council review against OpenRouter', function (): void {
     if (blank(config('ai.providers.openrouter.key'))) {
@@ -19,8 +18,10 @@ it('runs a real council review against OpenRouter', function (): void {
         get: { responses: { '200': { description: ok } } }
     YAML;
 
-    $result = app(CouncilOrchestrator::class)->review($spec, new ReviewRequest(ReviewMode::Council));
+    // QUEUE_CONNECTION=sync in the test environment runs the panel batch and
+    // judge job inline, so the review is already terminal once this returns.
+    $review = app(CreateReviewAction::class)($spec, ReviewMode::Council);
 
-    expect($result->status)->toBe('complete')
-        ->and($result->findings)->not->toBeEmpty();
+    expect($review->refresh()->status)->toBe('complete')
+        ->and($review->findings)->not->toBeEmpty();
 })->group('live');

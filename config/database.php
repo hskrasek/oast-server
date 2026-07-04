@@ -40,10 +40,15 @@ return [
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
-            'busy_timeout' => null,
-            'journal_mode' => null,
-            'synchronous' => null,
-            'transaction_mode' => 'DEFERRED',
+            // Concurrent queue workers + the SSE/tail readers share this file;
+            // without WAL + a busy timeout, job reservation hits "database is locked".
+            'busy_timeout' => (int) env('DB_BUSY_TIMEOUT', 5000),
+            'journal_mode' => env('DB_JOURNAL_MODE', 'WAL'),
+            'synchronous' => env('DB_SYNCHRONOUS', 'NORMAL'),
+            // IMMEDIATE, not DEFERRED: queue workers reserve jobs inside a
+            // transaction; a DEFERRED read→write upgrade gets SQLITE_BUSY
+            // instantly (busy_timeout never applies to upgrade deadlocks).
+            'transaction_mode' => env('DB_TRANSACTION_MODE', 'IMMEDIATE'),
         ],
 
         'mysql' => [

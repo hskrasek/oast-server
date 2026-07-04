@@ -9,10 +9,11 @@ use App\Council\Dimension;
 use App\Council\ReviewMode;
 use App\Http\Requests\StoreReviewRequest;
 use App\Http\Resources\ReviewResource;
+use Illuminate\Http\JsonResponse;
 
 final class ReviewController extends Controller
 {
-    public function store(StoreReviewRequest $request, CreateReviewAction $action): ReviewResource
+    public function store(StoreReviewRequest $request, CreateReviewAction $action): JsonResponse
     {
         $review = $action(
             $request->string('spec')->value(),
@@ -20,6 +21,8 @@ final class ReviewController extends Controller
             dimension: $request->enum('dimension', Dimension::class, Dimension::DomainModeling),
         );
 
-        return new ReviewResource($review);
+        return new ReviewResource($review)->response()
+            ->setStatusCode(202)
+            ->header('Location', route('reviews.show', $review));
     }
 }
