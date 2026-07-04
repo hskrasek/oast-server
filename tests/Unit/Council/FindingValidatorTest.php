@@ -32,6 +32,15 @@ it('exposes validation errors on the exception', function (): void {
     }
 });
 
+it('rejects a location that is not a JSON Pointer fragment', function (string|int|null $location): void {
+    (new FindingValidator)->validate([validFinding(['location' => $location])]);
+})->with([
+    'bare path' => '/paths/~1orders',
+    'plain anchor' => 'tags',
+    'missing' => null,
+    'non-string' => 7,
+])->throws(JudgeException::class);
+
 it('skips non-array findings', function (): void {
     $findings = ['not-an-array', validFinding()];
 
