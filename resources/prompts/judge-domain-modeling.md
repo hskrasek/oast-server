@@ -21,8 +21,11 @@ Confidence (from how many panelists independently raised it):
 
 - consensus: all/most panelists raised it.
 - majority: more panelists than not.
-- split: genuine disagreement — you MUST summarize each position in `disagreement`.
-- lone-flag: only one panelist raised it.
+- split: panelists took OPPOSING positions — at least one panelist argues FOR the design
+  (or against the change) while another argues against it. Silence is not disagreement:
+  if the other panelists simply did not mention the issue, that is lone-flag (or majority),
+  never split. You MUST summarize each side's actual position in `disagreement`.
+- lone-flag: only one panelist raised it and no one pushed back — the others are silent.
 
 Each finding's `location` must be a JSON Pointer into the provided spec, in the form
 `#/paths/~1orders~1{id}/get` — escape `/` inside path segments as `~1`. Populate every
