@@ -1,0 +1,17 @@
+{
+  "slug": "mixed-types",
+  "headline": 123,
+  "commentary_md": true,
+  "spec_name": 45.67,
+  "spec_source_url": null,
+  "spec_license": "MIT",
+  "dimension": "test",
+  "panelists": ["test/model"],
+  "judge": "test/judge",
+  "findings": [],
+  "metrics": [
+    {"model": "test", "ms": 1000, "usage": {"prompt_tokens": 100}, "cost_usd": 0.01}
+  ],
+  "reviewed_at": "2026-07-02T21:30:00Z",
+  "published_at": "2026-07-02T12:00:00Z"
+}
