@@ -8,6 +8,13 @@
     <h1 class="text-4xl font-bold mb-2">{{ $publication->headline }}</h1>
     <p class="text-gray-600 mb-8">{{ $publication->specName }}</p>
 
+    <!-- Commentary -->
+    @if (filled($publication->commentaryMd))
+    <section class="mb-8 prose prose-sm">
+        {!! Str::markdown($publication->commentaryMd, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
+    </section>
+    @endif
+
     <!-- Meta Strip -->
     <div class="bg-gray-100 p-6 rounded mb-12">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -23,10 +30,12 @@
                 <p class="text-gray-600">Dimension</p>
                 <p>{{ $publication->dimension }}</p>
             </div>
+            @if ($cost = $publication->totalCostUsd())
             <div>
                 <p class="text-gray-600">Cost</p>
-                <p class="font-mono">${{ number_format($publication->totalCostUsd(), 2) }}</p>
+                <p class="font-mono">${{ number_format($cost, 2) }}</p>
             </div>
+            @endif
             <div>
                 <p class="text-gray-600">Reviewed</p>
                 <p>{{ $publication->reviewedAt->format('M d, Y') }}</p>

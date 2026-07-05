@@ -1,0 +1,20 @@
+{
+  "slug": "slack-domain-modeling",
+  "headline": "Three frontier models vs. Slack's RPC habit",
+  "commentary_md": "Slack's Web API is *famously* RPC-like. This review shows why **domain modeling** matters. The panel found resources masquerading as actions, and suggested a more RESTful structure. <script>alert('xss')</script>",
+  "spec_name": "Slack Web API",
+  "spec_source_url": "https://api.slack.com/",
+  "spec_license": "Proprietary",
+  "dimension": "domain-modeling",
+  "panelists": ["~anthropic/claude-sonnet-latest", "openai/gpt-5.5", "z-ai/glm-5.2"],
+  "judge": "anthropic/claude-opus-4.8",
+  "findings": [
+    {"dimension": "domain-modeling", "title": "UI-surface concepts exposed as side-effecting GETs", "severity": "blocker", "confidence": "split", "location": "#/paths/~1views.open/get", "finding": "…", "why_it_matters": "…", "suggested_change": "…", "disagreement": "Voice A: a view has identity and lifecycle (open→push→update→close)... Voice B: modeling modal/workflow UI interactions as event-driven commands is not necessarily wrong..."}
+  ],
+  "metrics": [
+    {"model": "openai/gpt-5.5", "ms": 35000, "usage": {"prompt_tokens": 8900}, "cost_usd": 0.178},
+    {"total_cost_usd": 0.58}
+  ],
+  "reviewed_at": "2026-07-03T18:00:00Z",
+  "published_at": "2026-07-04T15:00:00Z"
+}

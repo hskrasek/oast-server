@@ -13,14 +13,14 @@ function fixtureRepo(): PublicationRepository
 it('loads publications sorted by published_at desc and skips malformed files', function (): void {
     $all = fixtureRepo()->all();
 
-    // Should have 3: train-travel-domain-modeling, no-cost-review, mixed-types
+    // Should have 5: train-travel (2026-07-05), slack (2026-07-04), no-cost (2026-07-04), mixed-types (2026-07-02), stripe (2026-06-29)
     // Skipped: malformed.json, missing-date.json, non-array.json
-    expect($all)->toHaveCount(3)
+    expect($all)->toHaveCount(5)
         ->and($all[0]->slug)->toBe('train-travel-domain-modeling')
         ->and($all[0]->findingCounts())->toBe(['blocker' => 1, 'should-fix' => 0, 'consider' => 1])
         ->and($all[0]->totalCostUsd())->toBe(0.62)
-        ->and($all[1]->slug)->toBe('no-cost-review')
-        ->and($all[1]->totalCostUsd())->toBeNull();
+        ->and($all[4]->slug)->toBe('stripe-workflows')
+        ->and($all[4]->totalCostUsd())->toBe(0.45);
 });
 
 it('finds by slug and returns null for unknown slugs', function (): void {

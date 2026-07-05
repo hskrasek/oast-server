@@ -45,6 +45,16 @@
     </section>
     @endif
 
+    <!-- Roadmap -->
+    <section class="mb-16">
+        <h2 class="text-3xl font-bold mb-8">What's Coming</h2>
+        <ul class="text-lg space-y-4">
+            <li><strong>CLI:</strong> <code class="font-mono">oast roast</code> in your terminal</li>
+            <li><strong>CI Gate:</strong> blockers fail the pipeline</li>
+            <li><strong>Hosted Platform:</strong> managed keys, teams</li>
+        </ul>
+    </section>
+
     <!-- Signup -->
     <section class="mb-16">
         <h2 class="text-3xl font-bold mb-4">Get Notified at Launch</h2>

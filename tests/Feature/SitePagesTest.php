@@ -13,7 +13,8 @@ it('renders the homepage with concept copy, featured reviews, and the signup for
         ->assertSee('Notify me')
         ->assertSee('name="website"', escape: false)   // honeypot present
         ->assertSee('The Council vs. a well-designed spec')  // featured publication headline
-        ->assertSee('consensus');
+        ->assertSee('consensus')
+        ->assertDontSee('Payment flow retry safety');  // 4th fixture is older, not in top 3
 });
 
 it('renders the reviews index', function (): void {
@@ -30,4 +31,10 @@ it('renders a review page with findings, meta, and cost', function (): void {
 
 it('404s unknown review slugs', function (): void {
     $this->get('/reviews/nope')->assertNotFound();
+});
+
+it('renders commentary as markdown and strips unsafe HTML', function (): void {
+    $this->get('/reviews/slack-domain-modeling')->assertOk()
+        ->assertSee('<em>famously</em>', escape: false)  // markdown emphasis rendered
+        ->assertDontSee('<script>');  // script tags stripped for safety
 });
