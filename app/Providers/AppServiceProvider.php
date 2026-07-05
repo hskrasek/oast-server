@@ -41,7 +41,7 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        \Illuminate\Support\Facades\RateLimiter::for('subscribe', fn(\Illuminate\Http\Request $request): \Illuminate\Cache\RateLimiting\Limit => \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by('subscribe:' . $request->ip()));
     }
 
     /**
