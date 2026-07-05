@@ -9,6 +9,7 @@ use App\Mail\ConfirmSubscription;
 use App\Site\Newsletter\NewsletterContacts;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 final class SubscribeController
 {
@@ -17,7 +18,11 @@ final class SubscribeController
         if (!$request->isSpam()) {
             $email = $request->string('email')->value();
             $contacts->create($email);
-            Mail::to($email)->send(new ConfirmSubscription($email));
+            try {
+                Mail::to($email)->send(new ConfirmSubscription($email));
+            } catch (Throwable $exception) {
+                report($exception);
+            }
         }
 
         return redirect('/')->with('status', 'Check your inbox to confirm.');

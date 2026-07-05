@@ -66,3 +66,13 @@ it('builds confirmation mail with signed link', function (): void {
         ->and($mailable->content()->view)->toBe('mail.confirm-subscription')
         ->and($mailable->content()->with['confirmUrl'])->toContain('/subscribe/confirm/a@b.test');
 });
+
+it('logs mail failure but still succeeds with idempotent create', function (): void {
+    Mail::shouldReceive('to')->with('a@b.test')->andThrow(new Exception('Mail send failed'));
+
+    $this->post('/subscribe', ['email' => 'a@b.test', 'website' => ''])
+        ->assertRedirect('/')
+        ->assertSessionHas('status', 'Check your inbox to confirm.');
+
+    expect($this->fake->created)->toBe(['a@b.test']);
+});

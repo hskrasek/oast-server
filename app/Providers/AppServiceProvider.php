@@ -9,7 +9,10 @@ use App\Council\FindingValidator;
 use App\Site\Newsletter\NewsletterContacts;
 use App\Site\Newsletter\SesNewsletterContacts;
 use Aws\SesV2\SesV2Client;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Container\Container;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 final class AppServiceProvider extends ServiceProvider
@@ -41,7 +44,7 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        \Illuminate\Support\Facades\RateLimiter::for('subscribe', fn(\Illuminate\Http\Request $request): \Illuminate\Cache\RateLimiting\Limit => \Illuminate\Cache\RateLimiting\Limit::perMinute(5)->by('subscribe:' . $request->ip()));
+        RateLimiter::for('subscribe', fn(Request $request): Limit => Limit::perMinute(5)->by('subscribe:' . $request->ip()));
     }
 
     /**
