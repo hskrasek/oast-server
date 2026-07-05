@@ -8,6 +8,9 @@ return [
     // The api.* subdomain the REST API is served on.
     'api_domain' => env('OAST_API_DOMAIN', 'api.oast.test'),
 
+    // Gate the entire api surface behind a feature flag.
+    'api_enabled' => (bool) env('OAST_API_ENABLED', true),
+
     // Panelist model slugs (OpenRouter). Hardcoded for M0; config-driven roster in M1.
     // Confirm exact OpenRouter slugs before the first live run.
     'panelists' => [
