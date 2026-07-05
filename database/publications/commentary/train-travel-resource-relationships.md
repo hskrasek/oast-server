@@ -1,0 +1,1 @@
+Same spec, different lens: are relationships modeled with the right mechanism — nest, link, or embed? The panel found hypermedia links that promise detail resources the spec never defines, and station references modeled as bare strings. Fewer findings than the domain pass, which is itself signal: this dimension isolates a different class of design debt.

@@ -14,6 +14,17 @@ beforeEach(function (): void {
     Http::fake(['openrouter.ai/api/v1/models' => Http::response(['data' => []])]);
 });
 
+it('no-ops on queue redelivery when a successful row already exists', function (): void {
+    Panelist::fake(['critique']);
+    $review = Review::factory()->create(['status' => 'running', 'mode' => 'council']);
+    $review->panelResponses()->create(['model' => 'openai/gpt-5.5', 'ok' => true, 'content' => 'first run']);
+
+    new RunPanelist($review->id, 'openai/gpt-5.5', Dimension::DomainModeling)->handle();
+
+    expect($review->panelResponses()->where('model', 'openai/gpt-5.5')->count())->toBe(1)
+        ->and($review->events()->count())->toBe(0);
+});
+
 it('stores a successful response and emits start/done events', function (): void {
     Panelist::fake(['a sharp critique']);
     $review = Review::factory()->create(['status' => 'running', 'mode' => 'council']);

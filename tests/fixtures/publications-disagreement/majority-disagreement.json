@@ -1,0 +1,19 @@
+{
+  "slug": "majority-disagreement",
+  "headline": "A majority finding with a recorded dissent",
+  "commentary_md": "Fixture for non-split disagreement rendering.",
+  "spec_name": "Test Spec",
+  "spec_source_url": "https://example.test/spec",
+  "spec_license": "CC0",
+  "dimension": "domain-modeling",
+  "panelists": ["~anthropic/claude-sonnet-latest", "openai/gpt-5.5", "z-ai/glm-5.2"],
+  "judge": "anthropic/claude-opus-4.8",
+  "findings": [
+    {"dimension": "domain-modeling", "title": "Majority finding with a dissenting voice", "severity": "consider", "confidence": "majority", "location": "#/paths/~1widgets", "finding": "…", "why_it_matters": "…", "suggested_change": "…", "disagreement": "One panelist dissented: this is intentional denormalization, not a modeling gap."}
+  ],
+  "metrics": [
+    {"total_cost_usd": 0.10}
+  ],
+  "reviewed_at": "2026-07-04T21:30:00Z",
+  "published_at": "2026-07-05T12:00:00Z"
+}

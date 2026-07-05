@@ -1,0 +1,19 @@
+{
+  "slug": "no-cost-review",
+  "headline": "A review without cost data",
+  "commentary_md": "This review has no cost tracking",
+  "spec_name": "Test Spec",
+  "spec_source_url": "https://example.com/spec",
+  "spec_license": "MIT",
+  "dimension": "test",
+  "panelists": ["test/model-1", "test/model-2"],
+  "judge": "test/judge",
+  "findings": [
+    {"dimension": "test", "title": "Test finding", "severity": "blocker", "confidence": "consensus", "location": "#/", "finding": "test", "why_it_matters": "test", "suggested_change": "test"}
+  ],
+  "metrics": [
+    {"model": "test/model-1", "ms": 1000, "usage": {"prompt_tokens": 100}, "cost_usd": 0.01}
+  ],
+  "reviewed_at": "2026-07-04T21:30:00Z",
+  "published_at": "2026-07-04T12:00:00Z"
+}

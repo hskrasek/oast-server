@@ -37,4 +37,9 @@ return [
         ],
     ],
 
+    'ses_contacts' => [
+        'list' => env('OAST_SES_CONTACT_LIST', 'oast-launch'),
+        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    ],
+
 ];

@@ -6,7 +6,13 @@ namespace App\Providers;
 
 use App\Council\CouncilOrchestrator;
 use App\Council\FindingValidator;
+use App\Site\Newsletter\NewsletterContacts;
+use App\Site\Newsletter\SesNewsletterContacts;
+use Aws\SesV2\SesV2Client;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Container\Container;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 final class AppServiceProvider extends ServiceProvider
@@ -23,6 +29,14 @@ final class AppServiceProvider extends ServiceProvider
                 $this->oastConfig(),
             ),
         );
+
+        $this->app->singleton(
+            NewsletterContacts::class,
+            fn(): NewsletterContacts => new SesNewsletterContacts(
+                new SesV2Client(['version' => 'latest', 'region' => config()->string('services.ses_contacts.region')]),
+                config()->string('services.ses_contacts.list'),
+            ),
+        );
     }
 
     /**
@@ -30,7 +44,15 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // CF-Connecting-IP is set by Cloudflare's edge and can't be spoofed by
+        // the client (Cloudflare overwrites it); X-Forwarded-For's left-most
+        // entry is client-suppliable and rotatable, so it's only a fallback
+        // for non-Cloudflare-fronted environments (e.g. local dev).
+        RateLimiter::for(
+            'subscribe',
+            fn(Request $request): Limit => Limit::perMinute(5)
+                ->by('subscribe:' . ($request->header('CF-Connecting-IP') ?? $request->ip())),
+        );
     }
 
     /**

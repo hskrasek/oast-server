@@ -1,0 +1,14 @@
+{
+  "slug": "missing-date",
+  "headline": "Missing publication date",
+  "commentary_md": "This record has no published_at",
+  "spec_name": "Test Spec",
+  "spec_source_url": "https://example.com",
+  "spec_license": "MIT",
+  "dimension": "test",
+  "panelists": ["test/model"],
+  "judge": "test/judge",
+  "findings": [],
+  "metrics": [],
+  "reviewed_at": "2026-01-01T00:00:00Z"
+}

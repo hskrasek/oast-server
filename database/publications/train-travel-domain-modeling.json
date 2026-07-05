@@ -1,0 +1,292 @@
+{
+    "slug": "train-travel-domain-modeling",
+    "headline": "The Council vs. a well-designed spec",
+    "commentary_md": "Phil Sturgeon's Train Travel API is a deliberately well-designed teaching spec \u2014 which is exactly why we reviewed it. A good tool has to prove it doesn't cry wolf on good work. The panel's verdict: solid bones, but the booking lifecycle exists only in prose, and payments are modeled as a fire-and-forget action. Both blockers drew unanimous agreement across all three models.\n",
+    "spec_name": "Train Travel API",
+    "spec_source_url": "https://github.com/bump-sh-examples/train-travel-api",
+    "spec_license": "CC-BY-SA 4.0",
+    "dimension": "domain-modeling",
+    "panelists": [
+        "~anthropic/claude-sonnet-latest",
+        "openai/gpt-5.5",
+        "z-ai/glm-5.2"
+    ],
+    "judge": "anthropic/claude-opus-4.8",
+    "findings": [
+        {
+            "dimension": "domain-modeling",
+            "title": "Payment modeled as a write-only singleton action, not a first-class retrievable resource with history",
+            "severity": "blocker",
+            "confidence": "consensus",
+            "location": "#/paths/~1bookings~1{bookingId}~1payment/post",
+            "finding": "POST /bookings/{bookingId}/payment is singular, has no GET, no list, and no top-level /payments/{id}. The payment can only be observed at the moment of creation. BookingPayment.id is described as usable to 'reference the payment in other objects' but there is no endpoint to dereference it. The description says 'a payment is an attempt,' implying multiple attempts, but the singular path bakes in a 1:1 assumption. The Payments tag explicitly promises 'view payment status and history,' which the API cannot deliver.",
+            "why_it_matters": "Clients cannot retrieve payment status after the fact (e.g. a pending payment where the webhook was missed), cannot list or retry attempts, and cannot view history \u2014 directly contradicting the API's own stated capability. If a booking can have multiple payment attempts (refunds, retries), the singular path forces a breaking change to introduce a collection later.",
+            "suggested_change": "Promote Payment to a collection resource: POST/GET /bookings/{bookingId}/payments and GET /payments/{paymentId} (or /bookings/{id}/payments/{paymentId}), retaining POST as the only mutator but adding retrievability and history."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Booking lifecycle state machine (held/confirmed/expired/cancelled) is entirely absent from the schema",
+            "severity": "blocker",
+            "confidence": "consensus",
+            "location": "#/components/schemas/Booking",
+            "finding": "The prose defines a clear state machine \u2014 booking created (hold) \u2192 paid (confirmed) \u2192 expired ('usually within 1 hour') \u2192 cancelled \u2014 but the Booking schema has no status field, no expires_at, no created_at/confirmed_at/cancelled_at timestamps. BookingPayment has a status field, but Booking does not. Clients must infer booking state from the existence of a successful payment, requiring cross-resource round trips.",
+            "why_it_matters": "State is business-critical and prominently documented in prose (including the 1-hour expiry warning) yet unqueryable. A client cannot tell whether a booking is a live hold, expired, or confirmed. Adding these fields later is technically additive, but clients built without them will encounter stale bookings and undefined behavior. The expiry rule in particular is unmodeled despite being central to the payment flow.",
+            "suggested_change": "Add read-only status enum (held, confirmed, expired, cancelled) and expires_at (plus created_at/confirmed_at) to the Booking schema so lifecycle state is observable in a single GET."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Cancellation via DELETE conflates 'release a hold' with 'cancel a confirmed/paid booking'",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths/~1bookings~1{bookingId}/delete",
+            "finding": "DELETE /bookings/{bookingId} is described as 'cancelling the hold on the trip.' This is a state transition dressed as deletion. It conflates deleting a never-paid hold (fine) with cancelling a confirmed, paid booking (a refund-triggering business process). The spec does not say what happens if you DELETE an already-paid booking, and using DELETE loses the audit trail \u2014 you cannot distinguish 'never booked' from 'booked then cancelled.'",
+            "why_it_matters": "Cancelling a paid booking has real domain side effects (refunds, inventory release) that a bare DELETE cannot express, and destroying the record eliminates booking history the user needs. Behavior on a paid booking is undefined.",
+            "suggested_change": "Model cancellation as an explicit transition: POST /bookings/{id}/cancellations (a Cancellation sub-resource carrying reason, refund amount, timestamps) or a status transition to 'cancelled', rather than DELETE."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "No Ticket resource despite payment prose promising tickets",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths/~1bookings~1{bookingId}~1payment/post",
+            "finding": "The payment description says paying 'will confirm the booking for the user and enable them to get their tickets,' but there is no Ticket schema and no endpoint (e.g. GET /bookings/{id}/tickets or /tickets/{id}) to retrieve travel documents, QR/barcodes, seat assignments, ticket numbers, or fulfillment status.",
+            "why_it_matters": "The core deliverable of a train booking flow \u2014 the ticket \u2014 is promised in prose but absent from the contract, leaving the booking flow incomplete for any real client.",
+            "suggested_change": "Add a Ticket resource, e.g. GET /bookings/{bookingId}/tickets and/or GET /tickets/{ticketId}, with passenger association, ticket identifiers, seat/validity, and a download/QR representation."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Item-level GET /stations/{id} and GET /trips/{id} are linked to but not defined",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths/~1trips/get",
+            "finding": "Response examples contain self links to /trips/{id} and origin/destination links to /stations/{id}, and Booking references trip_id, yet the spec defines no GET /stations/{stationId} or GET /trips/{tripId} operations. Following a trip's self link or a station link yields a 404.",
+            "why_it_matters": "The hypermedia links form a contract the API does not fulfill; clients dereferencing them break. It is also inconsistent to expose links to resources that have no retrieval endpoint.",
+            "suggested_change": "Add GET /stations/{stationId} and GET /trips/{tripId} operations (or remove the links). Also add a trip link relation on Booking so trip_id can be dereferenced."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Trip conflates timetable/journey with commercial offer, price, and availability",
+            "severity": "should-fix",
+            "confidence": "majority",
+            "location": "#/components/schemas/Trip",
+            "finding": "Trip bundles schedule data (origin, destination, departure/arrival, operator) with commercial data (price) and static allowance booleans (bicycles_allowed, dogs_allowed). In real rail booking, price is fare/offer/passenger/time-specific, and allowances may depend on operator, carriage, or availability. There is no fare class, fare conditions, refundability, offer expiry, journey legs/connections, or seat/capacity/availability. Bookings are created from a raw trip_id, losing the specific priced offer the user selected. Caching (Cache-Control on /trips) is also questionable when a volatile price is embedded in an otherwise cacheable timetable.",
+            "why_it_matters": "Collapsing timetable and offer into one entity means the API cannot represent fare classes, availability, connections, or time-limited quotes \u2014 central concepts for pan-European rail \u2014 and booking-by-trip-id loses the commercial context. This is hard to reverse once clients book against Trip.",
+            "suggested_change": "Split the timetable/journey (stable, cacheable) from a Fare/Offer resource (price, currency, availability, fare conditions, expiry, legs). Book from an offer_id rather than a raw trip_id.-"
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Passenger model is too flat \u2014 one bare-string name, no multi-passenger or passenger-type support",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/components/schemas/Booking/properties/passenger_name",
+            "finding": "Booking exposes only passenger_name as a single string, assuming exactly one passenger per booking. There is no support for group/family bookings, passenger types (adult/child/senior/youth) that drive fares, railcards, dates of birth, or contact/accessibility details. This contradicts the Bookings tag's promise of 'passenger details' (plural). has_bicycle/has_dog are also modeled per-booking, though in reality a specific passenger brings a bicycle or dog.",
+            "why_it_matters": "The common case of multiple passengers on one booking cannot be represented, and passenger-level attributes (fares, per-passenger extras) are impossible, creating an aggregate-boundary mismatch that is hard to change once clients depend on the flat shape.",
+            "suggested_change": "Replace passenger_name with a structured passengers array (name, type, optional DOB/railcard), and move bicycle/dog flags to the passenger level or a structured extras model."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Optional extras reduced to fixed booleans (has_bicycle/has_dog)",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/components/schemas/Booking/properties/has_bicycle",
+            "finding": "The API advertises 'optional extras' but models them as two booleans (has_bicycle, has_dog). Extras can have quantity, price, reservation requirements, inventory, and fulfillment rules. Every new extra requires a new boolean field.",
+            "why_it_matters": "A boolean-per-extra design is not extensible; adding new extras (e.g. luggage, seat reservation) forces schema churn rather than data changes.",
+            "suggested_change": "Model extras as a structured array of {type, quantity, price, reservation_required, ...} rather than fixed booleans."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Links-Origin and Links-Destination both define a 'self' property instead of origin/destination",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/components/schemas/Links-Origin",
+            "finding": "Links-Origin and Links-Destination are copy-pasted from Links-Self and each define a property literally named self rather than origin/destination. Composed via allOf into the trip response alongside Links-Self, three branches all contribute a 'self' key, so the schema does not match the example payload (which shows distinct self/origin/destination keys) and will not merge sensibly in codegen. Beyond the bug, it means the schema fails to encode 'link to origin/destination' as named domain concepts \u2014 link relation names are domain-significant.",
+            "why_it_matters": "The declared schema contradicts the examples and produces broken/ambiguous generated client code; the relationship semantics (origin, destination) are lost.",
+            "suggested_change": "Rename the properties to origin and destination respectively in Links-Origin and Links-Destination so the schema matches the intended and exampled payload shape."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "BookingPayment.links example labeled 'booking' points to the payment sub-resource",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/paths/~1bookings~1{bookingId}~1payment/post",
+            "finding": "In the Card payment success example, links.booking points to .../bookings/{id}/payment (the payment sub-resource), while the Bank example correctly points to .../bookings/{id}. The inconsistency suggests the resource relationships were not fully worked out.",
+            "why_it_matters": "A 'booking' link relation that points at a payment misleads clients and signals confused relationship modeling.",
+            "suggested_change": "Make the booking link consistently point to the booking resource (/bookings/{id}) in all payment examples."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Trip.price has no currency in a pan-European multi-currency API",
+            "severity": "should-fix",
+            "confidence": "majority",
+            "location": "#/components/schemas/Trip/properties/price",
+            "finding": "Trip.price is a bare number (e.g. 50) with no currency, while BookingPayment.currency is an ISO code across multiple European currencies (eur, gbp, chf, etc.). Clients cannot tell whether a trip costs 50 EUR, GBP, or CHF.",
+            "why_it_matters": "For an API operating across multiple currency zones, an amount without currency is ambiguous and can lead to incorrect pricing display and payment amounts.",
+            "suggested_change": "Give Trip its own currency, or model price as a structured {amount, currency} object."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Payment source leaks provider-specific (Stripe-like) and UK-specific banking concepts into a pan-European API",
+            "severity": "should-fix",
+            "confidence": "lone-flag",
+            "location": "#/components/schemas/BookingPayment/properties/source",
+            "finding": "The BookingPayment.source schema is unmistakably modeled on a specific payment provider, and the bank_account variant requires sort_code (a UK/Ireland-specific concept) while IBAN is the European standard. Requiring sort_code effectively excludes non-UK bank accounts.",
+            "why_it_matters": "Provider- and region-specific implementation details bleed into the travel domain contract, excluding much of the European market the API targets.",
+            "suggested_change": "Use pan-European banking identifiers (IBAN/BIC) for bank payments and abstract away provider-specific field shapes."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Client-supplied payment amount/currency rather than server-derived from the booking",
+            "severity": "should-fix",
+            "confidence": "lone-flag",
+            "location": "#/components/schemas/BookingPayment/properties/amount",
+            "finding": "BookingPayment requires the client to supply amount and currency. For a train booking, the amount owed should be determined by the booking/offer, not trusted from the client, which models payment as a generic payment-processor call rather than as part of the booking domain.",
+            "why_it_matters": "Trusting client-supplied amounts risks underpayment/mismatch and detaches the payment from the booking's actual price.",
+            "suggested_change": "Expose an amount-due on the booking (or a server-created payment intent) and validate or derive the payment amount server-side rather than accepting arbitrary client amounts."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Booking create request reuses the full persisted Booking schema",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/paths/~1bookings/post",
+            "finding": "POST /bookings uses the Booking schema (which includes readOnly id and represents a persisted record) as its request body. Creation input is a distinct domain concept (a booking request/order command) from the persisted booking, and reusing the same schema encourages a database-row model.",
+            "why_it_matters": "Conflating create input with the stored representation blurs the domain and makes it awkward to evolve request/response shapes independently (e.g. offer_id, passengers, extras, contact on input vs status/expiry/totals on output).",
+            "suggested_change": "Introduce a separate BookingRequest/CreateBooking schema for the request body distinct from the persisted Booking resource."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Missing capacity/seat/coach inventory concept",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/paths~1trips/get",
+            "finding": "There is no notion of seats, coaches, seat class, or remaining availability anywhere. A travel-booking domain without capacity means POST /bookings for a full train has undefined behavior (presumably 409), and users cannot select first/second class or seat type.",
+            "why_it_matters": "Availability and seat selection are central to rail booking; their total absence limits the API to toy scenarios and makes booking outcomes unpredictable.",
+            "suggested_change": "Introduce availability/seat inventory as a modeled concept (e.g. on the offer, or a seats/coaches resource) and allow class/seat selection at booking time."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Operator modeled as a bare string rather than a resource in a multi-operator API",
+            "severity": "consider",
+            "confidence": "majority",
+            "location": "#/components/schemas/Trip/properties/operator",
+            "finding": "Trip.operator is free-text (e.g. 'Deutsche Bahn', 'SNCF'). For an explicitly pan-European multi-operator API, operators are domain entities that may carry codes, logos, conditions of carriage, disruption links, and support contacts.",
+            "why_it_matters": "A bare string cannot carry operator metadata clients may need and prevents referencing a canonical operator identity.",
+            "suggested_change": "Model Operator as a structured object or linked resource (at least an id/code plus name) rather than free text."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Station search accepts coordinates but Station exposes no location or distance",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/components/schemas/Station",
+            "finding": "GET /stations accepts a coordinates parameter for proximity search, but the Station schema has no latitude/longitude, no distance-from-search-point in results, and no radius parameter. Station also lacks recognizable railway identifiers (e.g. UIC/national station codes) which clients often need alongside UUIDs.",
+            "why_it_matters": "If proximity search is a business feature, the resource cannot surface the location or distance data that makes results meaningful, and clients cannot map stations to well-known railway codes.",
+            "suggested_change": "Add location (lat/lon) and, for proximity results, a distance field to Station, plus standard station codes; consider a radius query parameter."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Wrapper-Collection lacks total count / total pages metadata",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/components/schemas/Wrapper-Collection",
+            "finding": "The generic collection wrapper provides next/prev pagination links but no total, total_pages, or count. The collection is a plumbing envelope with no collection-level metadata, and data is typed as an untyped array of objects.",
+            "why_it_matters": "Most clients building pagination UIs need total counts and must otherwise probe pages to discover the end of a collection.",
+            "suggested_change": "Add total/total_pages (or a count) to the pagination metadata in Wrapper-Collection / Links-Pagination."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "newBooking webhook payload includes nonsensical pagination links",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/webhooks/newBooking/post",
+            "finding": "The newBooking webhook composes Booking with both Links-Self and Links-Pagination. A single-event webhook has no concept of next/prev pages; this is copy-paste from the collection response composition. The event name 'newBooking' is also informal compared to a domain event like 'booking.created'.",
+            "why_it_matters": "Pagination links leak collection-response concerns into an event-delivery context, confusing consumers of the webhook.",
+            "suggested_change": "Remove Links-Pagination from the webhook payload (keep Links-Self and a link to the trip); consider naming the event booking.created."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "No webhook subscription management despite 'Subscribe to new bookings' wording",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/webhooks/newBooking/post",
+            "finding": "The webhook description says 'Subscribe to new bookings being created,' but the API models no subscription resource (e.g. POST/GET/DELETE /webhook-subscriptions). If subscription management is in scope, the capability is missing.",
+            "why_it_matters": "The prose implies a subscribe capability that the contract does not provide, leaving a gap for clients expecting to manage subscriptions.",
+            "suggested_change": "Either add webhook subscription resources (create/list/delete) or clarify that subscription management is out of band."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "No payment/booking-state webhook events despite an async payment lifecycle",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/webhooks",
+            "finding": "Only a newBooking webhook exists. The payment lifecycle (pending \u2192 succeeded/failed) is exactly the async state change a client integrating card/bank rails would want to subscribe to, but no payment or booking-state-change event is defined.",
+            "why_it_matters": "Without payment-state events, clients with pending payments have no push mechanism to learn the outcome, compounding the write-only payment problem.",
+            "suggested_change": "Add webhook events for payment status changes and/or booking state transitions."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Booking should snapshot what was booked rather than only a trip_id",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/components/schemas/Booking/properties/trip_id",
+            "finding": "Booking references only trip_id. If the underlying trip's price, departure time, operator, or availability changes, the booking should still reflect what the user actually held/purchased. A plain foreign key does not preserve the purchased terms, and trip_id itself reads as a relational column name rather than a domain relationship (no trip link relation is provided).",
+            "why_it_matters": "Without a snapshot, a booking's terms can silently drift with the underlying trip, and clients cannot reliably show what was purchased. The FK-style naming also leaks relational thinking.",
+            "suggested_change": "Snapshot the booked itinerary/offer terms (price, times, operator) onto the Booking, and add a trip link relation instead of relying on a raw trip_id."
+        }
+    ],
+    "metrics": [
+        {
+            "model": "~anthropic/claude-sonnet-latest",
+            "ms": 46985,
+            "usage": {
+                "prompt_tokens": 14068,
+                "completion_tokens": 3613,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 0
+            },
+            "cost_usd": 0.064266
+        },
+        {
+            "model": "openai/gpt-5.5",
+            "ms": 52992,
+            "usage": {
+                "prompt_tokens": 9893,
+                "completion_tokens": 4889,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 1034
+            },
+            "cost_usd": 0.227155
+        },
+        {
+            "model": "z-ai/glm-5.2",
+            "ms": 63256,
+            "usage": {
+                "prompt_tokens": 10072,
+                "completion_tokens": 3155,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 9263,
+                "reasoning_tokens": 1548
+            },
+            "cost_usd": 0.020876
+        },
+        {
+            "model": "anthropic/claude-opus-4.8",
+            "ms": 88707,
+            "usage": {
+                "prompt_tokens": 27018,
+                "completion_tokens": 7049,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 0
+            },
+            "cost_usd": 0.311315
+        },
+        {
+            "total_cost_usd": 0.623612
+        }
+    ],
+    "reviewed_at": "2026-07-04T16:27:13+00:00",
+    "published_at": "2026-07-05T12:26:45+00:00"
+}

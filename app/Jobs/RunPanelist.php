@@ -37,6 +37,14 @@ final class RunPanelist implements ShouldQueue
     public function handle(): void
     {
         $review = Review::query()->findOrFail($this->reviewId);
+
+        // Redelivery guard: if this panelist already has a successful row
+        // (queue visibility timeout expired mid-call), a second run would
+        // duplicate its critique and inflate the judge's consensus counts.
+        if ($review->panelResponses()->where('model', $this->model)->where('ok', true)->exists()) {
+            return;
+        }
+
         $review->appendEvent('panel.model.start', ['model' => $this->model]);
 
         $start = microtime(true);

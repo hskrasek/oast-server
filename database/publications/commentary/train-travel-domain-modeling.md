@@ -1,0 +1,1 @@
+Phil Sturgeon's Train Travel API is a deliberately well-designed teaching spec — which is exactly why we reviewed it. A good tool has to prove it doesn't cry wolf on good work. The panel's verdict: solid bones, but the booking lifecycle exists only in prose, and payments are modeled as a fire-and-forget action. Both blockers drew unanimous agreement across all three models.

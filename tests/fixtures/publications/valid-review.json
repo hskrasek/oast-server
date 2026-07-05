@@ -1,0 +1,21 @@
+{
+  "slug": "train-travel-domain-modeling",
+  "headline": "The Council vs. a well-designed spec",
+  "commentary_md": "Phil Sturgeon's Train Travel API is deliberately good. The panel still found real gaps.",
+  "spec_name": "Train Travel API",
+  "spec_source_url": "https://github.com/bump-sh-examples/train-travel-api",
+  "spec_license": "CC-BY-SA 4.0",
+  "dimension": "domain-modeling",
+  "panelists": ["~anthropic/claude-sonnet-latest", "openai/gpt-5.5", "z-ai/glm-5.2"],
+  "judge": "anthropic/claude-opus-4.8",
+  "findings": [
+    {"dimension": "domain-modeling", "title": "Booking lifecycle never modeled as data", "severity": "blocker", "confidence": "consensus", "location": "#/components/schemas/Booking", "finding": "…", "why_it_matters": "…", "suggested_change": "…"},
+    {"dimension": "domain-modeling", "title": "Extras reduced to booleans", "severity": "consider", "confidence": "lone-flag", "location": "#/components/schemas/Booking/properties/has_bicycle", "finding": "…", "why_it_matters": "…", "suggested_change": "…"}
+  ],
+  "metrics": [
+    {"model": "openai/gpt-5.5", "ms": 43920, "usage": {"prompt_tokens": 9893}, "cost_usd": 0.191215},
+    {"total_cost_usd": 0.62}
+  ],
+  "reviewed_at": "2026-07-04T21:30:00Z",
+  "published_at": "2026-07-05T12:00:00Z"
+}

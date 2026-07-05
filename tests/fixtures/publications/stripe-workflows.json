@@ -1,0 +1,18 @@
+{
+  "slug": "stripe-workflows",
+  "headline": "Payment flow retry safety",
+  "commentary_md": "Stripe's Payments API has solid design patterns. This review validates the workflow architecture.",
+  "spec_name": "Stripe Payments",
+  "spec_source_url": "https://stripe.com/docs/api",
+  "spec_license": "Proprietary",
+  "dimension": "workflows",
+  "panelists": ["~anthropic/claude-sonnet-latest", "openai/gpt-5.5", "z-ai/glm-5.2"],
+  "judge": "anthropic/claude-opus-4.8",
+  "findings": [],
+  "metrics": [
+    {"model": "openai/gpt-5.5", "ms": 28000, "usage": {"prompt_tokens": 7200}, "cost_usd": 0.144},
+    {"total_cost_usd": 0.45}
+  ],
+  "reviewed_at": "2026-06-28T10:00:00Z",
+  "published_at": "2026-06-29T09:00:00Z"
+}

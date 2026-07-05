@@ -1,0 +1,202 @@
+{
+    "slug": "train-travel-workflows",
+    "headline": "When step 3 of 5 fails: the workflow pass",
+    "commentary_md": "The workflow lens asks the question linters can't: when step 3 of 5 fails, can the client recover? Booking-then-payment is a genuine multi-step workflow, and the panel flagged the missing idempotency and recovery paths that turn a retry into a double-charge. This dimension is where our Arazzo roadmap points.\n",
+    "spec_name": "Train Travel API",
+    "spec_source_url": "https://github.com/bump-sh-examples/train-travel-api",
+    "spec_license": "CC-BY-SA 4.0",
+    "dimension": "workflows",
+    "panelists": [
+        "~anthropic/claude-sonnet-latest",
+        "openai/gpt-5.5",
+        "z-ai/glm-5.2"
+    ],
+    "judge": "anthropic/claude-opus-4.8",
+    "findings": [
+        {
+            "dimension": "workflows",
+            "title": "Booking lifecycle state machine is prose-only; Booking schema lacks status/expiry fields",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/components/schemas/Booking",
+            "finding": "All three panelists flag that the core booking\u2192payment\u2192confirmation\u2192expiry workflow is described only in prose (create-booking description and Payments tag warning about 1-hour expiry) but is not machine-readable. The Booking schema has no status field, no expires_at, no confirmed_at/cancelled_at, no payment_id, and no ticket links. A client cannot inspect GET /bookings/{id} to determine whether a booking is held, confirmed, expired, or cancelled. Notably, the child BookingPayment resource DOES carry a status enum while the parent Booking does not, which panelists call backwards.",
+            "why_it_matters": "The temporary-hold\u2192paid\u2192confirmed lifecycle is the primary business workflow of the API. Leaving it as tribal knowledge forces clients to guess legal next states, makes the documented expiry behavior unobservable via the API, and yields SDKs with status-less Booking objects.",
+            "suggested_change": "Add status (e.g. held, payment_pending, confirmed, expired, cancelled, failed), expires_at, and lifecycle timestamps to the Booking schema; document the state machine and legal transitions in the spec."
+        },
+        {
+            "dimension": "workflows",
+            "title": "Payment modeled as synchronous despite pending status and externally-dependent processing",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths/~1bookings~1{bookingId}~1payment/post",
+            "finding": "All three panelists note that POST /bookings/{bookingId}/payment only documents a synchronous 200 'Payment successful', yet BookingPayment.status includes 'pending'. Real card (3-D Secure/SCA) and bank-account payments are frequently asynchronous. There is no 202 Accepted, no Location header to a job/status resource, no Retry-After usage, and the spec never explains when 'pending' is returned, how long it may persist, whether to retry, or how to learn the final outcome.",
+            "why_it_matters": "If a payment returns pending or the synchronous POST times out, the client is stuck with no defined completion path \u2014 the pending enum value is operationally unusable. This is the most urgent async gap in the API.",
+            "suggested_change": "Either return 202 Accepted with a pollable operation/payment resource (Location + Retry-After), or document explicitly that pending means 'poll again later' via a GET endpoint and/or webhook. Distinguish 201/202/303 semantics for accepted-vs-completed work."
+        },
+        {
+            "dimension": "workflows",
+            "title": "Payment cannot be re-fetched \u2014 no GET on payment resource",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths/~1bookings~1{bookingId}~1payment",
+            "finding": "All three panelists observe that a payment can be POSTed but never GET-ted: there is no GET /bookings/{bookingId}/payment, no GET /payments/{paymentId}. The BookingPayment schema even exposes a readOnly id, implying a retrievable resource, yet none exists. If a payment is pending or the POST response is lost, the client has no way to check whether the payment was created or resolved.",
+            "why_it_matters": "Without a pollable payment resource, a pending status is a dead end and a lost POST response leaves the client unable to determine outcome without risking a duplicate charge on retry.",
+            "suggested_change": "Add a GET endpoint for the payment (e.g. GET /bookings/{bookingId}/payment or GET /payments/{paymentId}) returning current status and links back to the booking."
+        },
+        {
+            "dimension": "workflows",
+            "title": "No idempotency keys on booking/payment POSTs, contradicting the global retry policy",
+            "severity": "blocker",
+            "confidence": "consensus",
+            "location": "#/paths/~1bookings~1{bookingId}~1payment/post",
+            "finding": "All three panelists flag that neither POST /bookings nor POST /bookings/{bookingId}/payment accepts an Idempotency-Key header, while the top-level x-speakeasy-retries config auto-retries on 5XX and connection errors for all operations \u2014 including these non-idempotent POSTs. A generated SDK will retry a payment that already succeeded downstream, with no mechanism to prevent double-booking or double-charging. Panelists call this actively dangerous and a direct contradiction between the retry policy and the missing idempotency support. Recommended idempotency semantics: same key + same payload replays result; same key + different payload returns 409; keys retained for a defined period; scope per user/account.",
+            "why_it_matters": "Duplicate submission on the two most retry-sensitive operations can double-charge cards and double-hold seats \u2014 a data-corruption / financial-harm class of bug that will force a breaking change to fix safely later.",
+            "suggested_change": "Add and document an Idempotency-Key header on POST /bookings and POST /bookings/{bookingId}/payment, and reconsider or scope the global retry policy so non-idempotent POSTs are not auto-retried on connection errors."
+        },
+        {
+            "dimension": "workflows",
+            "title": "No compensation/rollback story for partial failures (payment fails, cancel-after-payment, expiry-during-pending)",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths/~1bookings~1{bookingId}/delete",
+            "finding": "All three panelists note the absence of a compensation model. DELETE /bookings/{bookingId} cancels the hold, but it is unspecified whether it may be applied to an already-paid/confirmed booking, whether it refunds, cancels tickets, or should return 409 for a confirmed booking. Also undefined: what happens to the hold when payment fails (can the client retry payment on the same booking or must they create a new one?), what happens if a booking expires while payment is pending, and what happens if payment succeeds but confirmation/ticket issuance fails. The generic 409 on create-booking hints at conflict detection but no Problem type documents the failed-payment-then-retry flow.",
+            "why_it_matters": "Every mid-workflow failure point (booking held but payment fails, payment captured but ticket issuance fails, delete during pending) can leave orphaned holds or charges. Undefined compensation is real design debt that leads to inconsistent client and server behavior.",
+            "suggested_change": "Document a state-transition/compensation table specifying allowed operations per booking state (e.g. pay on expired \u2192 409, delete on confirmed \u2192 refund workflow or 409) and define recovery behavior for failed payment, expiry-during-pending, and confirmation-after-payment failure."
+        },
+        {
+            "dimension": "workflows",
+            "title": "Booking response lacks hypermedia link to its payment/next-action endpoints",
+            "severity": "should-fix",
+            "confidence": "majority",
+            "location": "#/paths~1bookings/post",
+            "finding": "GLM-5.2 and GPT-5.5 both note that the create-booking 201 response and GET booking response only include a Links-Self link \u2014 there is no 'pay', 'cancel', 'payment', or 'tickets' link. The payment response links back to the booking (Links-Booking), but the reverse ('given a booking, where do I pay?') is absent, so clients must know out-of-band to POST /bookings/{bookingId}/payment. This is conspicuous given the API otherwise invests in HATEOAS links and the Wrapper-Collection is described as hypermedia controls. GPT-5.5 recommends conditionally exposing workflow controls (pay/cancel on held, tickets/payment on confirmed) or an available_actions array.",
+            "why_it_matters": "Without workflow links, the API's claimed HATEOAS design does not let clients discover legal next steps, forcing prior knowledge of URL conventions and undermining self-descriptiveness.",
+            "suggested_change": "Add conditional workflow links (pay, cancel, payment, tickets) and/or an available_actions field to Booking responses reflecting the booking's current state."
+        },
+        {
+            "dimension": "workflows",
+            "title": "newBooking webhook payload erroneously includes Links-Pagination",
+            "severity": "should-fix",
+            "confidence": "majority",
+            "location": "#/webhooks/newBooking/post",
+            "finding": "Claude and GPT-5.5 both flag that the newBooking webhook payload schema is allOf [Booking, Links-Self, Links-Pagination]. Pagination links (next/prev) make no sense for a single-event push notification and appear to be a copy-paste error from the collection response pattern.",
+            "why_it_matters": "A per-booking event advertising next/prev pagination links is a concrete modeling mistake that will confuse consumers and generated types.",
+            "suggested_change": "Remove Links-Pagination from the newBooking webhook payload; keep only Links-Self (or a resource link)."
+        },
+        {
+            "dimension": "workflows",
+            "title": "Webhook lacks a stable event envelope (id, type, timestamp, api_version, correlation)",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/webhooks/newBooking/post",
+            "finding": "All three panelists note the webhook payload is a raw Booking plus links, with no event envelope: no event_id, event_type, created_at, api_version, resource_type/resource_id, previous/current status, or client correlation id. Consumers cannot deduplicate redelivered events (no event id), cannot distinguish event types programmatically once more are added, and cannot correlate the event back to the initiating request.",
+            "why_it_matters": "Without a stable envelope, adding future event types is a breaking change, and consumers cannot safely dedupe or route events \u2014 undermining reliable async integration.",
+            "suggested_change": "Wrap webhook payloads in an envelope with id, type, created_at, api_version, and a data/resource block containing the object and its links."
+        },
+        {
+            "dimension": "workflows",
+            "title": "Webhook delivery, signing, subscription, and replay semantics are undocumented",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/webhooks/newBooking/post",
+            "finding": "All three panelists note the webhook contract is skeletal: no signature/verification scheme (no HMAC/X-Signature), no subscription/registration mechanism for callback URLs, no delivery semantics (at-least-once vs at-most-once), no retry schedule, timeout, accepted response codes beyond 200, ordering guarantees, duplicate-delivery expectations, dead-letter behavior, event retention, or manual replay API. The response only states 'Return a 200 status to indicate data was received successfully.'",
+            "why_it_matters": "A production webhook without signing, subscription, and delivery guarantees cannot be safely consumed; subscribers cannot verify authenticity, recover from downtime, or reason about duplicates and ordering.",
+            "suggested_change": "Document webhook signing/verification, subscription management, delivery guarantees, retry/timeout policy, accepted responses, duplicate/ordering expectations, retention, and replay."
+        },
+        {
+            "dimension": "workflows",
+            "title": "Webhook coverage limited to newBooking; missing payment/booking state-transition events",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/webhooks",
+            "finding": "All three panelists note the only webhook is newBooking, with no events for the state transitions that actually matter: payment pending/succeeded/failed, booking confirmed, booking expired, booking cancelled, or ticket issued. Since payments can be pending and bookings can expire, consumers must poll for those changes, defeating much of the webhook's purpose. GPT-5.5 additionally suggests operation-specific callbacks on the payment endpoint as an alternative delivery mechanism.",
+            "why_it_matters": "Without events for the interesting transitions, downstream systems can only stay in sync by polling, which the webhook was meant to avoid \u2014 especially important if payment is async.",
+            "suggested_change": "Add webhook event types (or operation callbacks) for payment.pending/succeeded/failed, booking.confirmed, booking.expired, booking.cancelled, and ticket issuance."
+        },
+        {
+            "dimension": "workflows",
+            "title": "No async result correlation (request-id / client_reference_id / operation-id)",
+            "severity": "should-fix",
+            "confidence": "majority",
+            "location": "#/paths/~1bookings~1{bookingId}~1payment/post",
+            "finding": "Claude, GPT-5.5, and GLM-5.2 all note weak correlation tooling: no Idempotency-Key, no X-Request-Id/X-Correlation-Id, no client_reference_id in the request body, and no operation_id. If a client times out before receiving a payment response, it cannot search by client request id, idempotency key, or operation id to reconcile. Clients can only match a newBooking webhook to their booking by manually comparing the id field, with nothing linking the webhook to the action that triggered it.",
+            "why_it_matters": "For payment especially, ambiguity from missing correlation leads to double charging or orphaned bookings when responses are lost.",
+            "suggested_change": "Add correlation mechanisms such as Idempotency-Key, X-Request-Id/X-Correlation-Id, a client_reference_id in the request body, and/or a retrievable operation_id/payment_id echoed in responses and webhooks."
+        },
+        {
+            "dimension": "workflows",
+            "title": "No ticket issuance workflow despite payment 'enabling tickets'",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/paths/~1bookings~1{bookingId}~1payment/post",
+            "finding": "GPT-5.5 notes the payment endpoint description says successful payment will 'enable them to get their tickets,' but there is no ticket resource or operation. If ticket generation is synchronous it should be explicit; if asynchronous it needs a job/status model; if tickets are links on the booking, the Booking schema should include them after confirmation. The final step of the customer workflow is missing.",
+            "why_it_matters": "The workflow terminates at payment with no defined way to obtain the actual tickets, leaving the last leg of the primary business process unspecified.",
+            "suggested_change": "Add a ticket resource, link, or issuance operation and specify whether it is synchronous or asynchronous."
+        },
+        {
+            "dimension": "workflows",
+            "title": "No general async convention exists for future long-running needs",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/paths",
+            "finding": "Claude notes GET /trips is legitimately fast and synchronous handling is fine (no complaint there), but the spec offers no general async pattern anywhere \u2014 no Operation/Job schema, no Retry-After tied to a job resource. Any future long-running need (bulk booking import, complex multi-operator fare search) would have to invent its own pattern from scratch.",
+            "why_it_matters": "Lack of an established async convention means inconsistent, ad-hoc designs when the API inevitably grows a long-running operation.",
+            "suggested_change": "Establish a reusable async operation/job convention (202 + Location + status resource) even if only the payment endpoint uses it initially."
+        }
+    ],
+    "metrics": [
+        {
+            "model": "~anthropic/claude-sonnet-latest",
+            "ms": 34745,
+            "usage": {
+                "prompt_tokens": 14160,
+                "completion_tokens": 2577,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 0
+            },
+            "cost_usd": 0.05409
+        },
+        {
+            "model": "openai/gpt-5.5",
+            "ms": 46137,
+            "usage": {
+                "prompt_tokens": 9959,
+                "completion_tokens": 4388,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 280
+            },
+            "cost_usd": 0.189835
+        },
+        {
+            "model": "z-ai/glm-5.2",
+            "ms": 82043,
+            "usage": {
+                "prompt_tokens": 10141,
+                "completion_tokens": 2644,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 1073
+            },
+            "cost_usd": 0.018331
+        },
+        {
+            "model": "anthropic/claude-opus-4.8",
+            "ms": 63376,
+            "usage": {
+                "prompt_tokens": 26539,
+                "completion_tokens": 4984,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 0
+            },
+            "cost_usd": 0.257295
+        },
+        {
+            "total_cost_usd": 0.519551
+        }
+    ],
+    "reviewed_at": "2026-07-05T12:08:06+00:00",
+    "published_at": "2026-07-05T12:26:46+00:00"
+}

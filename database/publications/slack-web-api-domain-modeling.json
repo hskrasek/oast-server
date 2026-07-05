@@ -1,0 +1,234 @@
+{
+    "slug": "slack-web-api-domain-modeling",
+    "headline": "Three frontier models vs. Slack's RPC habit",
+    "commentary_md": "Slack's Web API is famously RPC-in-a-trench-coat \u2014 method names like chat.postMessage, IDs in query strings, state transitions as bespoke verbs. We pointed the Council at it because it's a design that's defensible on purpose: Slack chose this shape. Watch the confidence column: where all three models converged you'll see consensus, and where only one model caught something you'll see it honestly labeled as a lone flag instead of laundered into false agreement.\n",
+    "spec_name": "Slack Web API",
+    "spec_source_url": "https://github.com/APIs-guru/openapi-directory/tree/main/APIs/slack.com",
+    "spec_license": "CC0",
+    "dimension": "domain-modeling",
+    "panelists": [
+        "z-ai/glm-5.2",
+        "~anthropic/claude-sonnet-latest",
+        "openai/gpt-5.5"
+    ],
+    "judge": "anthropic/claude-opus-4.8",
+    "findings": [
+        {
+            "dimension": "domain-modeling",
+            "title": "API is RPC method catalog, not resource model \u2014 every path is a verb string",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths",
+            "finding": "Every path is a flat RPC method name of the form `/{domain}.{action}` (e.g. `/chat.postMessage`, `/conversations.archive`, `/admin.apps.approve`, `/calls.participants.add`). There are zero path parameters in the entire spec; resource identity (conversation, message, user) is always smuggled into query params or form fields rather than expressed in the URL. All three panelists independently concluded the API documents method calls rather than resources.",
+            "why_it_matters": "Clients cannot reason about resource identity from URLs, caching and link-based discoverability are impossible, and clients must memorize a large flat verb catalog instead of navigating resources. The domain model is fragmented across method names, parameters, examples and large union schemas rather than expressed cleanly in the surface.",
+            "suggested_change": "Where feasible, collapse verb-per-action endpoints into resource-oriented paths with path parameters (e.g. `/conversations/{id}`, `/conversations/{id}/members/{user_id}`) and let HTTP methods carry semantics. All panelists acknowledge this reflects Slack's legacy RPC design and may be a tolerable historical tradeoff rather than fixable in place."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "No PATCH anywhere; field updates and state transitions exploded into separate endpoints",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths/~1conversations.rename/post",
+            "finding": "The spec uses zero PATCH operations. Pure field updates like `conversations.rename`, `conversations.setTopic`, `conversations.setPurpose` and per-setting mutators (`admin.teams.settings.setName`, `setDescription`, `setIcon`, `setDiscoverability`, `setDefaultChannels`) each get their own endpoint. Opposite state transitions on the same aggregate field are split into unrelated calls: `conversations.archive`/`unarchive`, `usergroups.enable`/`disable`, `admin.apps.approve`/`restrict`, `reminders.complete`. Panelists disagree on framing: two note this avoids the 'state transition smuggled into PATCH' anti-pattern and that explicit business transitions (archive, approve, complete) are legitimate operations with real side effects; but all agree plain field updates like rename/setTopic/setPurpose and per-setting mutators are just PATCH with extra steps and multiply endpoints per mutable field.",
+            "why_it_matters": "Multiplying endpoints per field/transition inflates the surface, hides the underlying aggregate's lifecycle from clients, and forces clients to know N endpoints for N mutable fields. Per-setting admin endpoints are UI-button-level granularity rather than domain-resource granularity.",
+            "disagreement": "One panelist (gpt-5.5) credits the explicit-transition style as good domain modeling for genuine business actions (archive/approve/complete) and would keep them; the others treat the wholesale avoidance of PATCH as worse than smuggling. All agree the pure field-update cases (rename/setTopic/setPurpose/settings.set*) should be PATCH.",
+            "suggested_change": "Consolidate pure field updates into `PATCH /conversations/{id}` and `PATCH` on a workspace-settings resource; consider retaining genuine business transitions as action sub-resources (e.g. `POST /conversations/{id}/archive`) rather than paired top-level verbs."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Admin and non-admin namespaces duplicate the same aggregates instead of using role-based authorization",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths/~1admin.conversations.archive/post",
+            "finding": "Entire parallel resource families exist for the same domain concepts differentiated only by actor/authority. `admin.conversations.*` (archive, unarchive, rename, create, delete, invite, setConversationPrefs, setTeams, convertToPrivate, disconnectShared) duplicates `conversations.*`, with overlapping operations (archive/unarchive/rename exist in both with different schemas). Similarly `admin.users.*` (assign, invite, remove, setAdmin, setOwner, setRegular, setExpiration) sits alongside `users.*` modeling the same user/membership entity twice. The `admin.*` prefix leaks the internal admin-service boundary into the public contract.",
+            "why_it_matters": "The same domain entity (conversation, user membership) is modeled twice with duplicated verbs, inconsistent schemas, and inconsistent auth conventions, doubling the surface clients must learn and preventing a single canonical resource with role-based capabilities.",
+            "suggested_change": "Model admin as an authorization/role dimension layered on a single Conversation/User/Membership resource rather than a structurally distinct duplicate resource tree."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Messages have no first-class resource \u2014 identified by composite (channel, ts) tuple",
+            "severity": "should-fix",
+            "confidence": "majority",
+            "location": "#/paths/~1chat.update/post",
+            "finding": "There is no `/messages/{id}` resource. A message is identified only by the composite `(channel, ts)` pair passed as parameters to unrelated RPCs (`chat.delete`, `chat.update`, `chat.getPermalink`, `pins.add`, `reactions.add`, `stars.add`). `ts` is clearly an internal database timestamp-as-primary-key exposed directly as the client identifier. Thread replies come via query-style `conversations.replies` rather than a message/thread sub-resource. No `GET /messages/{id}` equivalent exists.",
+            "why_it_matters": "Clients must carry `(channel_id, ts)` everywhere instead of one opaque message ID, and messages cannot be modeled as nested resources (`/conversations/{id}/messages/{ts}`) despite that being the natural shape for history, replies, reactions and pins. It exposes internal DB-row identity as the public contract.",
+            "suggested_change": "Introduce a first-class Message resource with an opaque ID nested under conversations, exposing GET/PATCH/DELETE and thread replies as a sub-collection."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Pins, stars, reactions modeled as commands on polymorphic targets, not as resources with identity",
+            "severity": "consider",
+            "confidence": "majority",
+            "location": "#/paths/~1pins.list/get",
+            "finding": "`stars.add`, `pins.add`, `reactions.add` take a loose bag of optional identifiers (`channel`+`timestamp`, or `file`, or `file_comment`) and the server infers the target. There is no Star/Pin/Reaction resource with its own identity \u2014 you cannot `GET /pins/{id}` or `DELETE /stars/{id}`; the full polymorphic reference must be resupplied every call. The list endpoints (`pins.list`, `stars.list`, `reactions.list`) use sprawling ad-hoc `anyOf` unions (message-pin vs file-pin vs file_comment-pin) to paper over the un-modeled polymorphism, duplicating discriminator logic in each list endpoint.",
+            "why_it_matters": "These are relationship resources ('reaction by user X on message Y') whose uniqueness, idempotency and ownership would be clearer if modeled as first-class relationships. The repeated anyOf unions signal a missing root-level type discriminator.",
+            "suggested_change": "Model pins/stars/reactions as relationship resources with a `type` discriminator at the schema root, or as sub-collections of their target items."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Structured domain objects passed as stringified JSON, leaking form-encoded transport into the model",
+            "severity": "should-fix",
+            "confidence": "lone-flag",
+            "location": "#/paths/~1chat.postMessage/post",
+            "finding": "Many fields that are conceptually structured domain objects are typed as `string` containing JSON: `attachments`/`blocks` on chat.postMessage and chat.update, `unfurls` on chat.unfurl, `prefs` on admin.conversations.setConversationPrefs, `dialog` on dialog.open, `view` on views.open/publish/push/update, `inputs`/`outputs` on workflows.updateStep, `outputs` on workflows.stepCompleted, `profile` on users.profile.set.",
+            "why_it_matters": "This leaks the form-urlencoded RPC transport into the domain model; the client sees `string` where the real business concept is a Block Kit view, modal, workflow step config, profile document, or conversation preferences object. The OpenAPI is much less useful as a contract and hides important resource structure.",
+            "suggested_change": "Type these as proper structured request-body schemas rather than opaque JSON-encoded strings."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Missing read/list operations for sub-resources and lifecycle entities clients need",
+            "severity": "should-fix",
+            "confidence": "majority",
+            "location": "#/paths/~1calls.info/get",
+            "finding": "Several aggregates lack the read/enumerate operations clients require. Calls: no `calls.list`, no `calls.participants.list` \u2014 you cannot enumerate calls or discover who is on one. User sessions: `admin.users.session.invalidate`/`reset` exist but no session list, yet `invalidate` requires a `session_id` that must be discovered elsewhere. Scheduled messages have an ID (`Q...` prefix), create/list/delete, but no update (no reschedule) and no first-class `/scheduled_messages/{id}` resource. App requests and invite requests expose separate pending/approved/denied list endpoints and approve/deny verbs but no single request resource with a `status` you can GET. There is no aggregate root to GET an app's current policy state \u2014 its lifecycle (requested\u2192approved\u2192restricted) is implicit in which list it appears on.",
+            "why_it_matters": "Clients cannot enumerate before mutating (sessions), cannot discover current lifecycle state of an entity (apps, requests), and must delete-and-recreate instead of updating (scheduled messages), forcing awkward workarounds and hidden dependencies on out-of-band data.",
+            "suggested_change": "Add list/read operations for participants and sessions, model scheduled messages and app/invite requests as first-class resources with a status field, and add an app-status/aggregate-root read."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "UI-surface concepts (views, dialogs) modeled as domain resources/commands",
+            "severity": "consider",
+            "confidence": "majority",
+            "location": "#/paths/~1views.open/get",
+            "finding": "`views.open`, `views.push`, `views.update`, `views.publish` and `dialog.open` are remote-control commands to manipulate transient UI surfaces on a user's Slack client, not durable domain resources. There is no `/views/{id}` resource; a view is a payload passed to commands, and `trigger_id` (a short-lived UI interaction token) is a required parameter, making these event-response commands. Additionally these mutating operations are exposed as `GET`.",
+            "why_it_matters": "This is UI-screen-as-resource \u2014 the rendering layer leaking directly into the public API contract. Modeling a modal/surface as a resource whose client rendering follows from resource state would be cleaner; the trigger_id and GET-for-mutation reveal the UI-plumbing origin.",
+            "suggested_change": "Where a view is genuinely persisted (it has an id and hash), model it as a resource with create/update/dismiss; otherwise clearly separate these UI-command operations from domain resources. Note that some inherently procedural endpoints (oauth, rtm.connect, migration.exchange, search) fit RPC naturally and need not be resource-modeled."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "State-changing operations exposed via GET, violating HTTP/domain safety semantics",
+            "severity": "should-fix",
+            "confidence": "lone-flag",
+            "location": "#/paths/~1apps.uninstall/get",
+            "finding": "Numerous mutating commands are exposed as GET rather than POST: `apps.uninstall` (uninstalls an app), `auth.revoke` (revokes a token), `apps.permissions.request` (requests scopes), `files.remote.share` (shares a file), `dialog.open`, `views.open/publish/push/update`, and `workflows.stepCompleted`/`stepFailed`/`updateStep`.",
+            "why_it_matters": "These are not safe reads; using GET for mutation breaks HTTP caching/prefetch assumptions and demonstrates the method namespace being prioritized over HTTP and domain semantics.",
+            "suggested_change": "Change state-changing operations to POST (or appropriate mutating methods)."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Inconsistent ubiquitous language: team/workspace/enterprise, conversation/channel, usergroup/subteam/IDP group",
+            "severity": "should-fix",
+            "confidence": "majority",
+            "location": "#/paths/~1team.info/get",
+            "finding": "Domain vocabulary is unsettled. Descriptions say 'workspace' while parameters use `team_id`/`team`; `admin.teams.create` says 'Create an Enterprise team' and `defs_workspace_id` allows both `T` and `E`, blending workspace and enterprise. The conversation abstraction is undermined by fields still named `channel`/`channels` throughout (`conversations.info`, `conversations.history`, `conversations.create` response). User groups are exposed as `usergroups.*` but the schema is `objs_subteam` (with `is_subteam`, `enterprise_subteam_id`) while admin endpoints call them 'IDP groups' \u2014 three unreconciled names for related concepts.",
+            "why_it_matters": "Clients cannot rely on a consistent domain vocabulary and must learn that team=workspace(sometimes)=enterprise, conversation=channel, and usergroup=subteam=IDP group, muddying the model and increasing integration errors.",
+            "suggested_change": "Settle on consistent ubiquitous-language terms across paths, parameters, and schemas, or explicitly document aliases and distinctions."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Internal implementation details and debug artifacts leaked into the public schema",
+            "severity": "should-fix",
+            "confidence": "majority",
+            "location": "#/paths/~1apps.permissions.info/get",
+            "finding": "The contract exposes implementation internals: error schemas include `callstack` ('PHP callstack is only visible in dev/qa') and `debug_step`/`dims`/`time_ident` marked 'possibly DEV/QA only'; `objs_user` contains a description referencing an internal Jira bug URL (jira.tinyspeck.com/EVALUE-1559); schema name `objs_subteam` leaks internal terminology; ID regexes force clients to depend on internal prefix taxonomy (`U` vs `W` local/grid user IDs, `C`/`G`/`D`, etc.). `migration.exchange` exists specifically to convert between `U` and `W` ID schemes \u2014 an internal data-migration concern exposed as a permanent public method. `disconnectShared` takes `leaving_team_ids` (plural) documented as 'currently only a single team id can be specified', leaking a backend limitation.",
+            "why_it_matters": "Debug artifacts (PHP callstacks) and internal identifiers in a production contract expose implementation history and internal sharding/versioning schemes, forcing clients to depend on internal details (ID-prefix parsing) that should be opaque.",
+            "suggested_change": "Remove dev/qa debug fields from the public contract, drop internal references, treat IDs as opaque, and align field names with documented capabilities."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Overloaded aggregate schemas with internal state flags (conversation, file, user)",
+            "severity": "consider",
+            "confidence": "majority",
+            "location": "#/components/schemas/objs_conversation",
+            "finding": "Major aggregates are broad union types papering over subtypes. `objs_conversation` covers public/private channels, MPIMs, IMs, shared/org/ext-shared channels via a large set of boolean flags (`is_channel`, `is_group`, `is_im`, `is_mpim`, `is_shared`, `is_ext_shared`, `is_org_shared`, `is_pending_ext_shared`, `is_thread_only`, `is_non_threadable`, `is_frozen`, `is_moved`, `unlinked`, `version`, `timezone_count`, `display_counts.display_counts`), forcing clients to inspect boolean combinations to determine the kind. `objs_file` similarly mixes hosted files, remote files, shares, thumbnails, comments, public links, reactions and image metadata; `objs_user` mixes identity, profile, enterprise membership, role/bot flags and locale.",
+            "why_it_matters": "These read like internal storage representations exposed directly rather than clean domain models; clients must derive entity subtype from flag combinations, and the mixture of many internal state flags weakens the aggregate as a coherent domain concept.",
+            "disagreement": "One panelist (glm-5.2) credits the unified conversations abstraction and the flag-based union as a reasonable improvement over the old channels/groups/im/mpim split, and praises objs_message as a rich domain object; others view the broad flag-laden unions as leaky internal representations.",
+            "suggested_change": "Consider narrower typed subtypes with a discriminator for conversation kinds, and separate distinct file/share/public-link/comment concepts, exposing fewer raw internal state flags."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Membership and workspace-sharing relationships not modeled as resources",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/paths/~1conversations.members/get",
+            "finding": "Channel membership is manipulated only through verbs (`conversations.invite`, `kick`, `join`, `leave`) plus a read-only `conversations.members`, with no unifying resource representing a user's relationship to a channel (role, join date). Workspace-to-conversation sharing is exposed as get/set/disconnect commands (`admin.conversations.getTeams`, `setTeams`, `disconnectShared`) rather than an association resource. Admin user operations (`assign`, `remove`, `setAdmin`, `setOwner`, `setRegular`, `setExpiration`) operate on what is really a workspace-membership aggregate (role, guest status, expiration, default channels) but that membership is never modeled as a resource.",
+            "why_it_matters": "Memberships and sharing associations are genuine domain relationships with their own attributes; modeling them as resources (`/conversations/{id}/members/{user_id}`, workspace-membership with a `role`) would clarify roles, uniqueness and lifecycle instead of hiding them behind verbs and ID lists.",
+            "suggested_change": "Introduce Membership and conversation-team-association resources with explicit role/status attributes."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Success responses often bare {ok:true} or unmodeled additionalProperties, hiding resulting resource state",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/paths/~1admin.conversations.archive/post",
+            "finding": "Many state-transition endpoints return only `{ok: true}` (e.g. admin.apps.approve, admin.conversations.archive/delete/rename, admin.emoji.add, dnd.endDnd, files.remote.add, workflows.stepCompleted), and a large fraction of endpoints declare success as `additionalProperties: true` with 'This method either only returns a brief OK response or a verbose schema is not available for this method,' despite examples showing rich domain objects.",
+            "why_it_matters": "Returning only `ok` forces clients to perform follow-up reads and hides the resulting state after a transition; the unmodeled additionalProperties schemas mean the domain contract is implicit rather than explicit \u2014 the maintainers themselves did not cleanly model the domain shape for many endpoints.",
+            "suggested_change": "Return the updated resource (or a typed transition result) after state transitions, and replace additionalProperties:true placeholder success schemas with explicit domain schemas."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Inconsistent token placement and auth-scope leaked into payloads",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/paths/~1chat.postMessage/post",
+            "finding": "The `token` parameter appears inconsistently as a header (admin.conversations.archive, chat.postMessage, auth.test), a query param (conversations.list, files.info, users.info), and a body field (admin.emoji.add, admin.conversations.restrictAccess.addGroup, dnd.setSnooze), sometimes required and sometimes not. Separately, chat.postMessage/delete/update/meMessage/postEphemeral/scheduleMessage accept an `as_user` boolean that switches between bot-scoped and user-scoped authorship \u2014 an authorization/scope concern leaked into the request body as a workaround for one endpoint serving two auth contexts.",
+            "why_it_matters": "Three different conventions for the same conceptual auth input give a poor, error-prone client experience, and encoding token-scope semantics as a payload flag (`as_user`) leaks the authorization context into the domain payload instead of deriving authorship from the token.",
+            "suggested_change": "Standardize token placement (single convention) and derive authorship from token scope rather than requiring an `as_user` payload flag."
+        },
+        {
+            "dimension": "domain-modeling",
+            "title": "Inconsistent naming conventions and two competing pagination styles reveal API evolution",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/paths/~1admin.conversations.convertToPrivate/post",
+            "finding": "Path/action naming mixes camelCase (convertToPrivate, disconnectShared, listOriginalConnectedChannelInfo, deleteScheduledMessage), dot-separated segments (approved.list, restrictAccess.addGroup), and snake_case operationIds \u2014 five different patterns within the admin.conversations tree alone. Pagination is split between cursor-based (`cursor`/`next_cursor` in response_metadata) on newer endpoints (conversations.list), page-based (`page`/`count`/`paging`) on older ones (search.messages, team.accessLogs), and some endpoints (files.list, reactions.list, stars.list) offer both simultaneously without deprecating the legacy style.",
+            "why_it_matters": "The naming inconsistency and three-way pagination handling leak the API's incremental evolution history into the contract; client libraries must handle all pagination variants and cannot rely on a consistent naming convention.",
+            "suggested_change": "Adopt a single consistent naming convention and standardize on cursor-based pagination, deprecating the legacy page/count style."
+        }
+    ],
+    "metrics": [
+        {
+            "model": "z-ai/glm-5.2",
+            "ms": 33164,
+            "usage": {
+                "prompt_tokens": 126859,
+                "completion_tokens": 3013,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 101488,
+                "reasoning_tokens": 86
+            },
+            "cost_usd": 0.114743
+        },
+        {
+            "model": "~anthropic/claude-sonnet-latest",
+            "ms": 59834,
+            "usage": {
+                "prompt_tokens": 188112,
+                "completion_tokens": 4678,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 0
+            },
+            "cost_usd": 0.423004
+        },
+        {
+            "model": "openai/gpt-5.5",
+            "ms": 66495,
+            "usage": {
+                "prompt_tokens": 126674,
+                "completion_tokens": 5613,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 1021
+            },
+            "cost_usd": 0.83239
+        },
+        {
+            "model": "anthropic/claude-opus-4.8",
+            "ms": 97189,
+            "usage": {
+                "prompt_tokens": 206248,
+                "completion_tokens": 7699,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 0
+            },
+            "cost_usd": 1.223715
+        },
+        {
+            "total_cost_usd": 2.593852
+        }
+    ],
+    "reviewed_at": "2026-07-05T12:39:00+00:00",
+    "published_at": "2026-07-05T12:42:16+00:00"
+}
