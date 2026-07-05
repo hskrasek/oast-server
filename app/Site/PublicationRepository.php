@@ -16,7 +16,7 @@ final class PublicationRepository
 
     public function __construct(?string $path = null)
     {
-        $this->path = $path ?? base_path('database/publications');
+        $this->path = $path ?? config()->string('site.publications_path');
     }
 
     /**
