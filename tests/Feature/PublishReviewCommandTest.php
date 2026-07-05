@@ -10,6 +10,10 @@ beforeEach(function (): void {
     config()->set('site.publications_path', base_path('database/publications-test'));
 });
 
+afterEach(function (): void {
+    File::deleteDirectory(base_path('database/publications-test'));
+});
+
 it('exports a complete review to a publication json', function (): void {
     $review = Review::factory()->create([
         'status' => 'complete',
@@ -74,4 +78,34 @@ it('publishes with minimal options', function (): void {
     expect($json['slug'])->toBe('minimal')
         ->and($json['headline'])->toBe('minimal')
         ->and($json['commentary_md'])->toBe('');
+});
+
+it('refuses malicious slugs with path traversal', function (): void {
+    $review = Review::factory()->create(['status' => 'complete']);
+
+    $this->artisan('site:publish', ['review' => $review->id, 'slug' => '../evil'])
+        ->assertExitCode(1);
+
+    expect(File::exists(base_path('database/publications-test/../evil.json')))->toBeFalse();
+});
+
+it('refuses slugs with slashes', function (): void {
+    $review = Review::factory()->create(['status' => 'complete']);
+
+    $this->artisan('site:publish', ['review' => $review->id, 'slug' => 'has/slash'])
+        ->assertExitCode(1);
+
+    expect(File::exists(base_path('database/publications-test/has/slash.json')))->toBeFalse();
+});
+
+it('refuses null created_at date', function (): void {
+    $review = Review::factory()->create([
+        'status' => 'complete',
+        'created_at' => null,
+    ]);
+
+    $this->artisan('site:publish', ['review' => $review->id, 'slug' => 'no-date'])
+        ->assertExitCode(1);
+
+    expect(File::exists(base_path('database/publications-test/no-date.json')))->toBeFalse();
 });

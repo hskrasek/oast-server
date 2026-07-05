@@ -32,8 +32,21 @@ final class PublishReviewCommand extends Command
             return self::FAILURE;
         }
 
-        $dir = config()->string('site.publications_path');
+        if ($review->created_at === null) {
+            $this->error('Review has no created_at; refusing to publish a file the site would skip.');
+
+            return self::FAILURE;
+        }
+
         $slug = (string) $this->argument('slug');
+
+        if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $slug)) {
+            $this->error('Slug must contain only lowercase letters, numbers, and hyphens.');
+
+            return self::FAILURE;
+        }
+
+        $dir = config()->string('site.publications_path');
         $target = $dir . '/' . $slug . '.json';
 
         if (File::exists($target)) {
@@ -60,7 +73,7 @@ final class PublishReviewCommand extends Command
             'judge' => config()->string('oast.judge'),
             'findings' => $review->findings,
             'metrics' => $review->metrics,
-            'reviewed_at' => $review->created_at?->toIso8601String(),
+            'reviewed_at' => $review->created_at->toIso8601String(),
             'published_at' => now()->toIso8601String(),
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
