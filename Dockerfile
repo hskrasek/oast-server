@@ -29,7 +29,7 @@ ENV SERVER_NAME=:8080
 # Deployment envs (ECS task def) may still override any of these.
 ENV LOG_CHANNEL=stderr
 ENV SESSION_DRIVER=cookie
-ENV CACHE_STORE=array
+ENV CACHE_STORE=file
 ENV QUEUE_CONNECTION=sync
 ENV DB_CONNECTION=sqlite
 ENV DB_DATABASE=/tmp/database.sqlite

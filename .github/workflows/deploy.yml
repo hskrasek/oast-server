@@ -17,6 +17,7 @@ jobs:
           coverage: xdebug
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      - run: bun run build
       - run: composer install --prefer-dist --no-interaction
       - run: composer test
   deploy:
