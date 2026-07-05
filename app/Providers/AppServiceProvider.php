@@ -6,6 +6,9 @@ namespace App\Providers;
 
 use App\Council\CouncilOrchestrator;
 use App\Council\FindingValidator;
+use App\Site\Newsletter\NewsletterContacts;
+use App\Site\Newsletter\SesNewsletterContacts;
+use Aws\SesV2\SesV2Client;
 use Illuminate\Container\Container;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,6 +24,14 @@ final class AppServiceProvider extends ServiceProvider
             fn(Container $app): CouncilOrchestrator => new CouncilOrchestrator(
                 $app->make(FindingValidator::class),
                 $this->oastConfig(),
+            ),
+        );
+
+        $this->app->singleton(
+            NewsletterContacts::class,
+            fn(): NewsletterContacts => new SesNewsletterContacts(
+                new SesV2Client(['version' => 'latest', 'region' => config()->string('services.ses_contacts.region')]),
+                config()->string('services.ses_contacts.list'),
             ),
         );
     }
