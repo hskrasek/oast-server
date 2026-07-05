@@ -1,0 +1,1 @@
+The workflow lens asks the question linters can't: when step 3 of 5 fails, can the client recover? Booking-then-payment is a genuine multi-step workflow, and the panel flagged the missing idempotency and recovery paths that turn a retry into a double-charge. This dimension is where our Arazzo roadmap points.

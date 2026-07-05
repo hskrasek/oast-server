@@ -1,0 +1,162 @@
+{
+    "slug": "train-travel-resource-relationships",
+    "headline": "Nest, link, or embed: the relationship pass",
+    "commentary_md": "Same spec, different lens: are relationships modeled with the right mechanism \u2014 nest, link, or embed? The panel found hypermedia links that promise detail resources the spec never defines, and station references modeled as bare strings. Fewer findings than the domain pass, which is itself signal: this dimension isolates a different class of design debt.\n",
+    "spec_name": "Train Travel API",
+    "spec_source_url": "https://github.com/bump-sh-examples/train-travel-api",
+    "spec_license": "CC-BY-SA 4.0",
+    "dimension": "resource-relationships",
+    "panelists": [
+        "~anthropic/claude-sonnet-latest",
+        "openai/gpt-5.5",
+        "z-ai/glm-5.2"
+    ],
+    "judge": "anthropic/claude-opus-4.8",
+    "findings": [
+        {
+            "dimension": "resource-relationships",
+            "title": "Trip links to /stations/{id} and /trips/{id} that don't exist; bookings can't navigate to their trip",
+            "severity": "blocker",
+            "confidence": "consensus",
+            "location": "#/paths/~1trips/get",
+            "finding": "The /trips response emits hypermedia links to origin/destination station resources (https://api.example.com/stations/{id}) and to individual trips (https://api.example.com/trips/{id}), but the spec defines no GET /stations/{stationId} and no GET /trips/{tripId} endpoint. Trips are only reachable via GET /trips, which mandates origin, destination, and date query params. Booking.trip_id is therefore not resolvable, and station links are dead ends.",
+            "why_it_matters": "The relationship graph is a directed graph with dead-end edges: clients following emitted links hit 404. A client holding a booking cannot fetch its trip's canonical representation (origin/destination/date may not even be known post-booking), and cannot resolve station links at all. This is a real navigability gap that forces re-derivation or impossible lookups.",
+            "suggested_change": "Add GET /stations/{stationId} and GET /trips/{tripId} resource endpoints so that the IDs and links the API already emits are actually resolvable. Alternatively, embed enough trip/station summary data inline to avoid forced lookups."
+        },
+        {
+            "dimension": "resource-relationships",
+            "title": "Links-Origin and Links-Destination schemas both define 'self', contradicting the example's origin/destination links",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/components/schemas/Links-Origin",
+            "finding": "The /trips item is composed via allOf of Trip + Links-Origin + Links-Destination, but both Links-Origin and Links-Destination define only a `self` property. Merging them yields conflicting/identical `self` keys, not the `links.origin` and `links.destination` shown in the example payload. The schema and examples have drifted apart.",
+            "why_it_matters": "The declared contract does not describe the link affordances the examples show. Clients and code generators relying on the schema will not see origin/destination link properties, and schema/example drift will worsen over time.",
+            "suggested_change": "Redefine Links-Origin to expose an `origin` property and Links-Destination a `destination` property (ideally nested under a `links` object matching the example), mirroring how Links-Booking defines a `booking` property."
+        },
+        {
+            "dimension": "resource-relationships",
+            "title": "Booking under-modeled: no links.trip and no trip context",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/components/schemas/Booking",
+            "finding": "Booking references trip_id as a plain scalar but includes no links.trip anywhere (not in the Booking schema, not in the Links-* set). Contrast with Trip (gets origin/destination links) and BookingPayment (gets Links-Booking). Booking is the one relationship in the spec that is under-linked, and with no GET /trips/{id} endpoint a client cannot traverse from booking to trip.",
+            "why_it_matters": "A client holding a booking cannot reliably traverse to the booked trip; the graph is not navigable in the 'I have a booking, show me the trip' direction. Booking is largely useless without its trip context.",
+            "suggested_change": "Add a links.trip (and links.payment) to Booking representations, e.g. links: { self, trip, payment }, and pair it with a real GET /trips/{tripId} endpoint."
+        },
+        {
+            "dimension": "resource-relationships",
+            "title": "Payment modeled as singular sub-resource despite anticipating multiple attempts; POST-only with no GET",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths/~1bookings~1{bookingId}~1payment",
+            "finding": "Payment is modeled as a singular POST-only sub-resource /bookings/{bookingId}/payment. But the description calls it 'an attempt to pay', the schema has status pending|failed|succeeded and its own UUID id, and the Payments tag promises to 'view payment status and history'. There is no GET on this path and no top-level /payments/{paymentId}, so a client cannot poll status, view history, or retry-and-list attempts. The lifecycle model is internally inconsistent: payment has independent identity but is buried and non-retrievable.",
+            "why_it_matters": "The schema and docs anticipate multiple attempts and status polling, but the paths only permit fire-and-forget POST. Clients cannot check a pending payment's status, list prior failed attempts, or give payment webhooks a RESTful target. This contradicts the API's own stated capabilities.",
+            "suggested_change": "If 1:1, add GET /bookings/{bookingId}/payment and state the singleton model explicitly. If multiple attempts are possible (as status/id imply), use a plural collection POST/GET /bookings/{bookingId}/payments (with GET .../payments/{paymentId}) or a top-level /payments/{paymentId}."
+        },
+        {
+            "dimension": "resource-relationships",
+            "title": "No expand/include strategy forces N+1 fetches for bookings and trips",
+            "severity": "should-fix",
+            "confidence": "consensus",
+            "location": "#/paths/~1bookings/get",
+            "finding": "There is no ?expand= or ?include= mechanism anywhere. A client listing bookings gets only trip_ids and must resolve each trip (and each trip's two stations) separately \u2014 an N+1 pattern that is currently even impossible since GET /trips/{id} does not exist. Trip search similarly returns station IDs with no embedded station summaries. The spec mixes IDs, some links, and no expansion controls.",
+            "why_it_matters": "For a travel-booking UI that displays 'your bookings' with trip and station details, the absence of expansion forces many round trips. This is real design debt for the domain's obvious display needs.",
+            "suggested_change": "Introduce a documented, consistent include/expand convention (e.g. GET /bookings?include=trip,payment or GET /trips?include=origin,destination) and define where expanded resources appear in the response schema.claUde notes this absence may be an acceptable v1 gap but should be a deliberate decision.-others push for adding it."
+        },
+        {
+            "dimension": "resource-relationships",
+            "title": "Payment example links.booking points to /payment in one example, /bookings/{id} in another",
+            "severity": "consider",
+            "confidence": "majority",
+            "location": "#/paths/~1bookings~1{bookingId}~1payment/post",
+            "finding": "In the payment success response examples, the Card example returns links.booking = https://api.example.com/bookings/{id}/payment (pointing at the payment sub-resource, i.e. itself), while the Bank example correctly returns links.booking = https://api.example.com/bookings/{id}. The same schema field disagrees between two examples.",
+            "why_it_matters": "Accidental example drift in a relationship link misleads clients about what URL the booking relation holds, and is exactly the kind of denormalization error that arises when relationships are modeled partly by path, partly by hand-written links.",
+            "suggested_change": "Fix the Card example's links.booking to point at the booking (/bookings/{id}), consistent with the Bank example."
+        },
+        {
+            "dimension": "resource-relationships",
+            "title": "newBooking webhook payload includes pagination links on a single resource",
+            "severity": "consider",
+            "confidence": "majority",
+            "location": "#/webhooks/newBooking/post",
+            "finding": "The newBooking webhook body composes Links-Self + Links-Pagination onto a single Booking object. Pagination links (next/prev) are a collection concern and make no sense on a single-resource event payload; this looks copied from the collection-response pattern. The example itself only includes self, which is correct.",
+            "why_it_matters": "The declared schema advertises relationship links that are meaningless for a single-event payload and mismatch the example, causing schema/example drift and client confusion.",
+            "suggested_change": "Drop Links-Pagination from the webhook payload; use Links-Self and consider adding trip/payment links tying back to the related resources."
+        },
+        {
+            "dimension": "resource-relationships",
+            "title": "Trip.origin/destination lack format: uuid unlike all other ID fields",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/components/schemas/Trip",
+            "finding": "Trip.origin and Trip.destination are typed type: string with no format: uuid, unlike every other ID field in the spec (Booking.trip_id, Booking.id, Station.id all use format: uuid).",
+            "why_it_matters": "Inconsistent typing of the same conceptual entity (station IDs) across the API weakens the relationship contract and can confuse code generation and validation.",
+            "suggested_change": "Add format: uuid to Trip.origin and Trip.destination for consistency with other ID fields."
+        },
+        {
+            "dimension": "resource-relationships",
+            "title": "XML and JSON representations of /trips carry different link affordances",
+            "severity": "consider",
+            "confidence": "lone-flag",
+            "location": "#/paths/~1trips/get",
+            "finding": "The application/json /trips response composes items via allOf of Trip + Links-Origin + Links-Destination, but the application/xml version uses $ref: '#/components/schemas/Trip' directly, without the origin/destination link composition. The two representations of the same resource are not equivalent, with no indication this is deliberate.",
+            "why_it_matters": "One representation carries relationship link affordances and the other does not \u2014 a denormalization-across-representations trap that means XML clients cannot traverse to stations the way JSON clients can.",
+            "suggested_change": "Align the XML and JSON /trips schemas so both carry the same origin/destination link affordances (or document the divergence deliberately)."
+        }
+    ],
+    "metrics": [
+        {
+            "model": "~anthropic/claude-sonnet-latest",
+            "ms": 33782,
+            "usage": {
+                "prompt_tokens": 14179,
+                "completion_tokens": 2626,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 0
+            },
+            "cost_usd": 0.054618
+        },
+        {
+            "model": "openai/gpt-5.5",
+            "ms": 29415,
+            "usage": {
+                "prompt_tokens": 9968,
+                "completion_tokens": 3340,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 93
+            },
+            "cost_usd": 0.15283
+        },
+        {
+            "model": "z-ai/glm-5.2",
+            "ms": 49474,
+            "usage": {
+                "prompt_tokens": 10149,
+                "completion_tokens": 3258,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 1990
+            },
+            "cost_usd": 0.02238
+        },
+        {
+            "model": "anthropic/claude-opus-4.8",
+            "ms": 39905,
+            "usage": {
+                "prompt_tokens": 24537,
+                "completion_tokens": 3185,
+                "cache_write_input_tokens": 0,
+                "cache_read_input_tokens": 0,
+                "reasoning_tokens": 0
+            },
+            "cost_usd": 0.20231
+        },
+        {
+            "total_cost_usd": 0.432138
+        }
+    ],
+    "reviewed_at": "2026-07-05T12:08:06+00:00",
+    "published_at": "2026-07-05T12:26:45+00:00"
+}
