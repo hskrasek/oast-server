@@ -14,5 +14,14 @@
 7. GitHub repo variables: `AWS_DEPLOY_ROLE_ARN`, `AWS_REGION`, `ECR_REPOSITORY`.
 8. Steady state: merge to main → GHA tests → image → deploy. Publications changes are code, so
    publishing a review deploys like any commit.
-9. Rollback: `aws ecs update-service` pinning the previous task definition revision, or revert the
-   commit.
+9. Rollback: task definition revisions do **not** pin images in this setup (every revision's
+   container image is `:latest`), so re-registering an old task-def revision does nothing — the
+   image tag resolves to whatever `:latest` currently points at regardless of revision. Use one of:
+   - **Instant** — re-point `:latest` at the last-good SHA already in ECR, then redeploy:
+     ```
+     MANIFEST=$(aws ecr batch-get-image --repository-name oast-server --image-ids imageTag=<GOOD_SHA> --output text --query 'images[0].imageManifest')
+     aws ecr put-image --repository-name oast-server --image-tag latest --image-manifest "$MANIFEST"
+     aws ecs update-service --cluster oast --service oast-app --force-new-deployment
+     ```
+   - **Clean** — `git revert` the bad commit and push to `main`; CI rebuilds and deploys under a
+     new SHA (full pipeline latency).

@@ -35,5 +35,5 @@ jobs:
           docker push "$REPO:$GITHUB_SHA"
           docker push "$REPO:latest"
         env:
-          REPO: ${{ steps.ecr.outputs.registry }}/oast-server
+          REPO: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY || 'oast-server' }}
       - run: aws ecs update-service --cluster oast --service oast-app --force-new-deployment
