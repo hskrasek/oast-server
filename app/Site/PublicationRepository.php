@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Site;
 
 use Throwable;
+use DomainException;
 
 final class PublicationRepository
 {
@@ -32,9 +33,16 @@ final class PublicationRepository
         foreach (glob($this->path . '/*.json') ?: [] as $file) {
             try {
                 $data = json_decode((string) file_get_contents($file), true, 64, JSON_THROW_ON_ERROR);
-                if (is_array($data)) {
-                    $publications[] = Publication::fromArray($data);
+                if (!is_array($data)) {
+                    report(new DomainException('Publication JSON decoded to non-array in ' . $file));
+
+                    continue;
                 }
+
+                // Narrow type: keep only string-keyed entries
+                $stringKeyed = array_filter($data, is_string(...), ARRAY_FILTER_USE_KEY);
+                $publications[] = Publication::fromArray($stringKeyed);
+
             } catch (Throwable $exception) {
                 report($exception); // a bad publication must never 500 the site
             }

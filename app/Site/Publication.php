@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Site;
 
 use Carbon\CarbonImmutable;
+use InvalidArgumentException;
 
 final readonly class Publication
 {
@@ -30,10 +31,21 @@ final readonly class Publication
     ) {}
 
     /**
-     * @param  array<string, string|array>  $data
+     * @param  array<string, mixed>  $data
      */
     public static function fromArray(array $data): self
     {
+        $reviewedAtStr = self::asString($data['reviewed_at'] ?? '');
+        $publishedAtStr = self::asString($data['published_at'] ?? '');
+
+        if ($reviewedAtStr === '' || $reviewedAtStr === '0') {
+            throw new InvalidArgumentException('Publication missing required reviewed_at date');
+        }
+
+        if ($publishedAtStr === '' || $publishedAtStr === '0') {
+            throw new InvalidArgumentException('Publication missing required published_at date');
+        }
+
         $slug = self::asString($data['slug'] ?? '');
         $headline = self::asString($data['headline'] ?? '');
         $commentaryMd = self::asString($data['commentary_md'] ?? '');
@@ -44,8 +56,6 @@ final readonly class Publication
         $judge = self::asString($data['judge'] ?? '');
         $findings = is_array($data['findings'] ?? null) ? $data['findings'] : [];
         $metrics = is_array($data['metrics'] ?? null) ? $data['metrics'] : [];
-        $reviewedAtStr = self::asString($data['reviewed_at'] ?? '');
-        $publishedAtStr = self::asString($data['published_at'] ?? '');
 
         return new self(
             slug: $slug,

@@ -13,6 +13,8 @@ function fixtureRepo(): PublicationRepository
 it('loads publications sorted by published_at desc and skips malformed files', function (): void {
     $all = fixtureRepo()->all();
 
+    // Should have 3: train-travel-domain-modeling, no-cost-review, mixed-types
+    // Skipped: malformed.json, missing-date.json, non-array.json
     expect($all)->toHaveCount(3)
         ->and($all[0]->slug)->toBe('train-travel-domain-modeling')
         ->and($all[0]->findingCounts())->toBe(['blocker' => 1, 'should-fix' => 0, 'consider' => 1])
@@ -107,4 +109,32 @@ it('counts findings by severity and ignores unknown severities', function (): vo
     ]);
 
     expect($pub->findingCounts())->toBe(['blocker' => 2, 'should-fix' => 1, 'consider' => 1]);
+});
+
+it('throws when reviewed_at is missing', function (): void {
+    expect(fn() => Publication::fromArray([
+        'slug' => 'test',
+        'headline' => 'test',
+        'spec_name' => 'test',
+        'dimension' => 'test',
+        'panelists' => [],
+        'judge' => 'test',
+        'findings' => [],
+        'metrics' => [],
+        'published_at' => '2026-01-02T00:00:00Z',
+    ]))->toThrow(InvalidArgumentException::class, 'reviewed_at');
+});
+
+it('throws when published_at is missing', function (): void {
+    expect(fn() => Publication::fromArray([
+        'slug' => 'test',
+        'headline' => 'test',
+        'spec_name' => 'test',
+        'dimension' => 'test',
+        'panelists' => [],
+        'judge' => 'test',
+        'findings' => [],
+        'metrics' => [],
+        'reviewed_at' => '2026-01-01T00:00:00Z',
+    ]))->toThrow(InvalidArgumentException::class, 'published_at');
 });
