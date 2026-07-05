@@ -25,10 +25,18 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // cloudflared on localhost is the only ingress path in prod, so
-        // trusting all proxies is correct: it resolves the real client IP
-        // from X-Forwarded-For and honors X-Forwarded-Proto so @vite/asset()/
-        // signedRoute generate https behind the tunnel.
-        $middleware->trustProxies(at: '*');
+        // trusting all proxies is correct. Deliberately NOT trusting
+        // X-Forwarded-Host: Cloudflare's edge doesn't overwrite it, so a
+        // client can set it to an arbitrary value, which would otherwise
+        // leak into signedRoute()-generated URLs (e.g. the SES confirm
+        // link) and enable phishing via our own mail. Only For/Proto/Port
+        // are needed to resolve the real client IP and https scheme.
+        $middleware->trustProxies(
+            at: '*',
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_PROTO
+                | Request::HEADER_X_FORWARDED_PORT,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Map domain/validation failures to RFC 9457 problem+json on the API host.

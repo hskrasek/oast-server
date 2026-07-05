@@ -44,7 +44,15 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        RateLimiter::for('subscribe', fn(Request $request): Limit => Limit::perMinute(5)->by('subscribe:' . $request->ip()));
+        // CF-Connecting-IP is set by Cloudflare's edge and can't be spoofed by
+        // the client (Cloudflare overwrites it); X-Forwarded-For's left-most
+        // entry is client-suppliable and rotatable, so it's only a fallback
+        // for non-Cloudflare-fronted environments (e.g. local dev).
+        RateLimiter::for(
+            'subscribe',
+            fn(Request $request): Limit => Limit::perMinute(5)
+                ->by('subscribe:' . ($request->header('CF-Connecting-IP') ?? $request->ip())),
+        );
     }
 
     /**

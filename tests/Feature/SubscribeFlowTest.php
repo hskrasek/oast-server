@@ -48,25 +48,39 @@ it('rate limits after 5 attempts per minute', function (): void {
     $this->post('/subscribe', ['email' => 'a6@b.test', 'website' => ''])->assertStatus(429);
 });
 
-it('rate limits per real client ip resolved through the trusted tunnel proxy', function (): void {
+it('rate limits per real client ip resolved via the Cloudflare-set CF-Connecting-IP header', function (): void {
     RateLimiter::clear('subscribe:10.0.0.1');
     RateLimiter::clear('subscribe:10.0.0.2');
 
     foreach (range(1, 5) as $i) {
-        $this->withHeaders(['X-Forwarded-For' => '10.0.0.1'])
+        $this->withHeaders(['CF-Connecting-IP' => '10.0.0.1'])
             ->post('/subscribe', ['email' => "ip1-{$i}@b.test", 'website' => ''])
             ->assertRedirect('/');
     }
 
-    // 6th request from the same forwarded IP is throttled.
-    $this->withHeaders(['X-Forwarded-For' => '10.0.0.1'])
+    // 6th request from the same CF-reported IP is throttled.
+    $this->withHeaders(['CF-Connecting-IP' => '10.0.0.1'])
         ->post('/subscribe', ['email' => 'ip1-6@b.test', 'website' => ''])
         ->assertStatus(429);
 
-    // A different forwarded IP has its own bucket and still passes.
-    $this->withHeaders(['X-Forwarded-For' => '10.0.0.2'])
+    // A different CF-reported IP has its own bucket and still passes.
+    $this->withHeaders(['CF-Connecting-IP' => '10.0.0.2'])
         ->post('/subscribe', ['email' => 'ip2-1@b.test', 'website' => ''])
         ->assertRedirect('/');
+});
+
+it('does not let a client-supplied X-Forwarded-Host leak into the signed confirm link', function (): void {
+    $this->withHeaders(['X-Forwarded-Host' => 'evil.com'])
+        ->post('/subscribe', ['email' => 'a@b.test', 'website' => ''])
+        ->assertRedirect('/');
+
+    Mail::assertSent(ConfirmSubscription::class, function (ConfirmSubscription $mail): bool {
+        $confirmUrl = $mail->content()->with['confirmUrl'];
+
+        expect($confirmUrl)->not->toContain('evil.com');
+
+        return true;
+    });
 });
 
 it('confirms via a signed link', function (): void {
