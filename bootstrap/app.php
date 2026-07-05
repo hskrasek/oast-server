@@ -24,7 +24,11 @@ return Application::configure(basePath: dirname(__DIR__))
         apiPrefix: '',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // cloudflared on localhost is the only ingress path in prod, so
+        // trusting all proxies is correct: it resolves the real client IP
+        // from X-Forwarded-For and honors X-Forwarded-Proto so @vite/asset()/
+        // signedRoute generate https behind the tunnel.
+        $middleware->trustProxies(at: '*');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Map domain/validation failures to RFC 9457 problem+json on the API host.

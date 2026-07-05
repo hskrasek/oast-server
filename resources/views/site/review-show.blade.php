@@ -73,10 +73,16 @@
                 <p class="italic text-gray-600 mb-4">{{ $finding['why_it_matters'] }}</p>
                 @endif
 
-                @if (($finding['confidence'] ?? null) === 'split' && filled($finding['disagreement'] ?? null))
+                @if (filled($finding['disagreement'] ?? null))
+                @if (($finding['confidence'] ?? null) === 'split')
                 <blockquote data-split class="bg-gray-50 border-l-4 border-gray-400 pl-4 py-2 mb-4 italic">
                     {{ $finding['disagreement'] }}
                 </blockquote>
+                @else
+                <blockquote data-disagreement class="bg-gray-50 border-l-4 border-gray-400 pl-4 py-2 mb-4 italic">
+                    {{ $finding['disagreement'] }}
+                </blockquote>
+                @endif
                 @endif
 
                 @if ($finding['suggested_change'] ?? null)

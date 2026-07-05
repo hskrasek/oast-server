@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Tests\Support\FakeNewsletterContacts;
+use Tests\Support\ThrowingOnConfirmNewsletterContacts;
 
 beforeEach(function (): void {
     Mail::fake();
@@ -47,6 +48,27 @@ it('rate limits after 5 attempts per minute', function (): void {
     $this->post('/subscribe', ['email' => 'a6@b.test', 'website' => ''])->assertStatus(429);
 });
 
+it('rate limits per real client ip resolved through the trusted tunnel proxy', function (): void {
+    RateLimiter::clear('subscribe:10.0.0.1');
+    RateLimiter::clear('subscribe:10.0.0.2');
+
+    foreach (range(1, 5) as $i) {
+        $this->withHeaders(['X-Forwarded-For' => '10.0.0.1'])
+            ->post('/subscribe', ['email' => "ip1-{$i}@b.test", 'website' => ''])
+            ->assertRedirect('/');
+    }
+
+    // 6th request from the same forwarded IP is throttled.
+    $this->withHeaders(['X-Forwarded-For' => '10.0.0.1'])
+        ->post('/subscribe', ['email' => 'ip1-6@b.test', 'website' => ''])
+        ->assertStatus(429);
+
+    // A different forwarded IP has its own bucket and still passes.
+    $this->withHeaders(['X-Forwarded-For' => '10.0.0.2'])
+        ->post('/subscribe', ['email' => 'ip2-1@b.test', 'website' => ''])
+        ->assertRedirect('/');
+});
+
 it('confirms via a signed link', function (): void {
     $url = URL::signedRoute('subscribe.confirm', ['email' => 'a@b.test']);
 
@@ -75,4 +97,20 @@ it('logs mail failure but still succeeds with idempotent create', function (): v
         ->assertSessionHas('status', 'Check your inbox to confirm.');
 
     expect($this->fake->created)->toBe(['a@b.test']);
+});
+
+it('confirms idempotently when SES reports the contact was never found', function (): void {
+    app()->instance(NewsletterContacts::class, new ThrowingOnConfirmNewsletterContacts('NotFoundException'));
+
+    $url = URL::signedRoute('subscribe.confirm', ['email' => 'a@b.test']);
+
+    $this->get($url)->assertOk()->assertSee('confirmed', escape: false);
+});
+
+it('surfaces other SES failures as a server error', function (): void {
+    app()->instance(NewsletterContacts::class, new ThrowingOnConfirmNewsletterContacts('BadRequestException'));
+
+    $url = URL::signedRoute('subscribe.confirm', ['email' => 'a@b.test']);
+
+    $this->get($url)->assertStatus(500);
 });

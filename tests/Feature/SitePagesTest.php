@@ -38,3 +38,21 @@ it('renders commentary as markdown and strips unsafe HTML', function (): void {
         ->assertSee('<em>famously</em>', escape: false)  // markdown emphasis rendered
         ->assertDontSee('<script>');  // script tags stripped for safety
 });
+
+it('renders disagreement text for a non-split finding, not just split confidence', function (): void {
+    app()->bind(PublicationRepository::class, fn(): PublicationRepository => new PublicationRepository(base_path('tests/fixtures/publications-disagreement')));
+
+    $this->get('/reviews/majority-disagreement')->assertOk()
+        ->assertSee('majority')
+        ->assertSee('One panelist dissented: this is intentional denormalization, not a modeling gap.');
+});
+
+it('honors X-Forwarded-Proto from the trusted tunnel proxy when generating asset urls', function (): void {
+    $html = $this->withHeaders(['X-Forwarded-Proto' => 'https'])
+        ->get('/')
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->toContain('src="https://')
+        ->and($html)->not->toContain('src="http://');
+});
