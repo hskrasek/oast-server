@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+vendor
+tests
+storage/logs/*
+database/database.sqlite
+.env*
+infra
+docs
+fixtures
+.superpowers
