@@ -66,3 +66,45 @@ it('constructs publication from array with various types', function (): void {
     expect($pub->slug)->toBe('test')
         ->and($pub->headline)->toBe('headline');
 });
+
+it('handles asString type coercion for all scalar types', function (): void {
+    // Test string (already string)
+    expect(Publication::asString('hello'))->toBe('hello');
+    // Test null
+    expect(Publication::asString(null))->toBe('');
+    // Test array
+    expect(Publication::asString([]))->toBe('');
+    // Test boolean true
+    expect(Publication::asString(true))->toBe('1');
+    // Test boolean false
+    expect(Publication::asString(false))->toBe('');
+    // Test integer
+    expect(Publication::asString(42))->toBe('42');
+    // Test float
+    expect(Publication::asString(3.14))->toBe('3.14');
+});
+
+it('counts findings by severity and ignores unknown severities', function (): void {
+    $pub = Publication::fromArray([
+        'slug' => 'test',
+        'headline' => 'test',
+        'spec_name' => 'test',
+        'dimension' => 'test',
+        'panelists' => [],
+        'judge' => 'test',
+        'findings' => [
+            ['severity' => 'blocker'],
+            ['severity' => 'should-fix'],
+            ['severity' => 'consider'],
+            ['severity' => 'blocker'],
+            ['severity' => 'unknown-severity'],
+            ['no-severity-key' => 'value'],
+            'not-an-array',
+        ],
+        'metrics' => [],
+        'reviewed_at' => '2026-01-01T00:00:00Z',
+        'published_at' => '2026-01-02T00:00:00Z',
+    ]);
+
+    expect($pub->findingCounts())->toBe(['blocker' => 2, 'should-fix' => 1, 'consider' => 1]);
+});

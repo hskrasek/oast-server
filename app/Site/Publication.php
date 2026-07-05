@@ -55,13 +55,23 @@ final readonly class Publication
             specSourceUrl: $specSourceUrl,
             specLicense: $specLicense,
             dimension: $dimension,
-            panelists: array_values(array_map(fn(mixed $v): string => self::asString($v), (array) ($data['panelists'] ?? []))),
+            panelists: array_values(array_map(self::asString(...), (array) ($data['panelists'] ?? []))),
             judge: $judge,
             findings: $findings,
             metrics: $metrics,
             reviewedAt: CarbonImmutable::parse($reviewedAtStr),
             publishedAt: CarbonImmutable::parse($publishedAtStr),
         );
+    }
+
+    public static function asString(mixed $value): string
+    {
+        return match (true) {
+            is_string($value) => $value,
+            is_null($value), is_array($value) => '',
+            is_bool($value), is_int($value), is_float($value) => (string) $value,
+            default => '',
+        };
     }
 
     /**
@@ -91,24 +101,5 @@ final readonly class Publication
         }
 
         return null;
-    }
-    /**
-     * @return string
-     */
-    private static function asString(mixed $value): string
-    {
-        if (is_string($value)) {
-            return $value;
-        }
-
-        if (is_null($value) || is_array($value)) {
-            return '';
-        }
-
-        if (is_bool($value) || is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-
-        return '';
     }
 }
