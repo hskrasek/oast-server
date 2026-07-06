@@ -10,6 +10,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::domain(config()->string('oast.api_domain'))->middleware(EnsureApiEnabled::class)->group(function () {
     Route::post('/reviews', [ReviewController::class, 'store']);
-    Route::get('/reviews/{review}', ShowReviewController::class)->name('reviews.show');
-    Route::get('/reviews/{review}/events', ReviewEventsController::class)->name('reviews.events');
+    Route::get('/reviews/{review}', ShowReviewController::class)->name('api.reviews.show');
+    Route::get('/reviews/{review}/events', ReviewEventsController::class)->name('api.reviews.events');
 });
