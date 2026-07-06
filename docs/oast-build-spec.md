@@ -185,7 +185,10 @@ case; whole-spec review is a one-shot audit). CLI `--ci` flag for non-interactiv
 mode (exit codes on blocker findings). **Hard prerequisite for any CI gate: finding
 fingerprinting + a suppression/baseline file** (the `location` pointers carried since M0
 are the fingerprint input) — without it, non-deterministic reruns flake pipelines and the
-tool gets uninstalled. Spectral sidecar lands here. The ratatui TUI moves to the deferred
+tool gets uninstalled. Spectral sidecar lands here. Also lands here: **`site:publish
+--standalone`** — emit a self-contained, no-login HTML file for a review (the
+"share with your team" story for private specs; proven by hand for the
+Modernize review on 2026-07-06). The ratatui TUI moves to the deferred
 rings (M5+); the M1 plain CLI output carries interactive use until then.
 
 **M3 — Web client.** Laravel-served frontend consuming the same SSE stream. The `location`

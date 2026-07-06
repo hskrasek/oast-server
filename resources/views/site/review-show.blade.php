@@ -3,7 +3,7 @@
 @section('title', $publication->specName . ' - oast')
 
 @section('content')
-<div class="mx-auto max-w-[880px] px-6 py-16 flex flex-col gap-10">
+<x-site.page class="py-16 flex flex-col gap-10">
     <!-- Review Header -->
     <header class="flex flex-col gap-4">
         <p class="o-label">{{ $publication->specName }} · {{ $publication->dimension }}</p>
@@ -12,7 +12,7 @@
 
     <!-- Commentary -->
     @if (filled($publication->commentaryMd))
-    <section class="o-body-serif [&_em]:italic [&_a]:underline">
+    <section class="[&_em]:italic [&_a]:underline">
         {!! Str::markdown($publication->commentaryMd, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
     </section>
     @endif
@@ -114,5 +114,5 @@
         </article>
         @endforeach
     </section>
-</div>
+</x-site.page>
 @endsection

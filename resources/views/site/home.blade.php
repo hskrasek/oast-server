@@ -3,10 +3,10 @@
 @section('content')
 <!-- Hero -->
 <section class="o-hero">
-    <div class="mx-auto max-w-[1160px] px-6 lg:px-12 py-20 lg:py-24 grid gap-14 lg:grid-cols-[1fr_540px] items-center">
+    <div class="mx-auto max-w-hero px-6 lg:px-12 py-20 lg:py-24 grid gap-14 lg:grid-cols-[1fr_540px] items-center">
         <div class="flex flex-col gap-7">
             <h1 class="o-display">Your API design, argued over by a panel that never gets tired.</h1>
-            <p class="o-body-serif max-w-[46ch]">Spectral tells you an operationId is missing. Nobody tells you your resource model leaks the database, your payment flow can't be retried safely, or your 'REST' API is RPC in a trench coat — until clients depend on it.</p>
+            <p class="max-w-[46ch]">Spectral tells you an operationId is missing. Nobody tells you your resource model leaks the database, your payment flow can't be retried safely, or your 'REST' API is RPC in a trench coat — until clients depend on it.</p>
             <div class="flex items-center gap-4">
                 <a href="#notify" class="o-btn">Notify me</a>
                 <a href="{{ route('reviews.index') }}" class="o-btn o-btn-outline">read the reviews →</a>
@@ -38,22 +38,22 @@
     </div>
 </section>
 
-<div class="mx-auto max-w-[880px] px-6 flex flex-col gap-20 py-20">
+<x-site.page class="flex flex-col gap-20 py-20">
     <!-- How It Works -->
     <section class="flex flex-col gap-6">
         <h2 class="o-label">How it works</h2>
         <ol class="flex flex-col gap-5">
             <li class="flex gap-4 items-baseline">
-                <span class="o-mono-ui text-ember">01</span>
-                <p class="o-body-serif">Three frontier models critique your spec independently — no shared rubric, no groupthink.</p>
+                <span class="font-mono text-mono-ui text-ember">01</span>
+                <p>Three frontier models critique your spec independently — no shared rubric, no groupthink.</p>
             </li>
             <li class="flex gap-4 items-baseline">
-                <span class="o-mono-ui text-ember">02</span>
-                <p class="o-body-serif">A judge model organizes their critiques into findings — it never adds its own.</p>
+                <span class="font-mono text-mono-ui text-ember">02</span>
+                <p>A judge model organizes their critiques into findings — it never adds its own.</p>
             </li>
             <li class="flex gap-4 items-baseline">
-                <span class="o-mono-ui text-ember">03</span>
-                <p class="o-body-serif">Every finding carries severity (blocker / should-fix / consider) and confidence (consensus / majority / split / lone-flag).</p>
+                <span class="font-mono text-mono-ui text-ember">03</span>
+                <p>Every finding carries severity (blocker / should-fix / consider) and confidence (consensus / majority / split / lone-flag).</p>
             </li>
         </ol>
     </section>
@@ -61,12 +61,12 @@
     <!-- Split Explainer -->
     <section class="flex flex-col gap-6">
         <h2 class="o-label">When the panel disagrees</h2>
-        <p class="o-body-serif">When the panel disagrees, you see both sides. A split on a blocker is the most valuable thing we can show you.</p>
+        <p>When the panel disagrees, you see both sides. A split on a blocker is the most valuable thing we can show you.</p>
         <div class="o-finding">
             <div class="o-finding-header">
                 <div class="flex items-center gap-2.5">
                     <span class="o-split-badge">split</span>
-                    <span class="o-mono-small text-faint">the panel disagrees — both positions, unaveraged</span>
+                    <span class="font-mono text-mono-small text-faint">the panel disagrees — both positions, unaveraged</span>
                 </div>
                 <div class="o-title">UI-surface concepts (views, dialogs) exposed as side-effecting GETs</div>
             </div>
@@ -110,16 +110,16 @@
         <h2 class="o-label">What's coming</h2>
         <ul class="flex flex-col gap-4">
             <li class="flex gap-4 items-baseline">
-                <span class="o-mono-ui text-ink">CLI</span>
-                <span class="o-body-serif"><code class="o-mono-ui">oast roast</code> in your terminal</span>
+                <span class="font-mono text-mono-ui text-ink">CLI</span>
+                <span><code class="font-mono text-mono-ui text-muted">oast roast</code> in your terminal</span>
             </li>
             <li class="flex gap-4 items-baseline">
-                <span class="o-mono-ui text-ink">CI gate</span>
-                <span class="o-body-serif">blockers fail the pipeline</span>
+                <span class="font-mono text-mono-ui text-ink">CI gate</span>
+                <span>blockers fail the pipeline</span>
             </li>
             <li class="flex gap-4 items-baseline">
-                <span class="o-mono-ui text-ink">hosted</span>
-                <span class="o-body-serif">managed keys, teams</span>
+                <span class="font-mono text-mono-ui text-ink">hosted</span>
+                <span>managed keys, teams</span>
             </li>
         </ul>
     </section>
@@ -134,14 +134,14 @@
                 <input type="text" name="website" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true">
                 <button type="submit" class="o-btn">Notify me</button>
             </div>
-            <p class="o-mono-small text-subtle">We're building in the open. Leave an email, get the launch.</p>
+            <p class="font-mono text-mono-small text-subtle">We're building in the open. Leave an email, get the launch.</p>
             @if (session('status'))
             <p role="status" class="o-confirm-box"><span class="font-semibold">→</span> {{ session('status') }}</p>
             @endif
             @error('email')
-            <p role="alert" class="o-mono-small text-ember">{{ $message }}</p>
+            <p role="alert" class="font-mono text-mono-small text-danger">{{ $message }}</p>
             @enderror
         </form>
     </section>
-</div>
+</x-site.page>
 @endsection

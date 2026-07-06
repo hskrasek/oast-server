@@ -25,9 +25,19 @@ every component, and the guidelines to use these names (values unchanged):
 - Unchanged: `--ember`, `--ember-bright`, `--amber`, `--copper`, `--text-on-accent` → `--color-on-accent`, voice tokens, gradients, glows, radii, `--shadow-frame`.
 
 When you emit code with utility classes, use the Tailwind names production generates:
-`bg-surface`, `bg-raised`, `bg-sunken`, `border-edge`, `border-hairline`, `text-ink`,
-`text-body`, `text-muted`, `text-subtle`, `text-faint`, `text-ember`, `bg-voice-a-wash`,
-`rounded-card`, `rounded-control`, `rounded-badge`, `rounded-frame`, `shadow-frame`.
+- Color: `bg-surface`, `bg-raised`, `bg-sunken`, `border-edge`, `border-edge-soft`,
+  `border-hairline`, `border-edge-strong`, `text-ink`, `text-body`, `text-muted`,
+  `text-subtle`, `text-faint`, `text-ember`, `text-amber`, `text-copper`,
+  `bg-voice-a-wash`, `bg-voice-b-wash`; states: `text-success`/`border-success`
+  (aliases amber), `text-danger` (aliases ember).
+- Type roles (size+line-height tokens; compose with `font-serif`/`font-mono` and weight):
+  `text-display` (+`text-display-mobile`), `text-display-light`, `text-headline`
+  (+`text-headline-mobile`), `text-title`, `text-body-serif`, `text-quote`,
+  `text-finding`, `text-mono-ui`, `text-mono-small`, `text-label`, `text-colhead`,
+  `text-badge`; tracking: `tracking-label`, `tracking-colhead`, `tracking-badge`,
+  `tracking-sev`.
+- Structure: `rounded-badge/control/card/frame/pill`, `shadow-frame`, `max-w-page`
+  (880px), `max-w-hero` (1160px), `h-control` (46px), `animate-fade-in`.
 
 ## 2. Implementation decisions to absorb (production reality)
 

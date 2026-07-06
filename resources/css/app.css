@@ -3,10 +3,10 @@
 /* Self-hosted fonts (Fontsource) — no third-party font requests. */
 @import "@fontsource-variable/newsreader/opsz.css";
 @import "@fontsource-variable/newsreader/opsz-italic.css";
-@import "@fontsource/ibm-plex-mono/400.css";
-@import "@fontsource/ibm-plex-mono/500.css";
-@import "@fontsource/ibm-plex-mono/600.css";
-@import "@fontsource/ibm-plex-mono/400-italic.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
+@import "@fontsource/ibm-plex-mono/latin-500.css";
+@import "@fontsource/ibm-plex-mono/latin-600.css";
+@import "@fontsource/ibm-plex-mono/latin-400-italic.css";
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -56,11 +56,62 @@
     --font-serif: "Newsreader Variable", Georgia, serif;
     --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 
-    /* radius — tight, technical */
+    /* Type scale (design roles). Sizes pair with line-heights; weight and
+       family compose separately (font-serif/font-mono, font-*). */
+    --text-display: 54px;
+    --text-display--line-height: 1.1;
+    --text-display-mobile: 38px;
+    --text-display-mobile--line-height: 1.12;
+    --text-display-light: 74px;
+    --text-display-light--line-height: 1.08;
+    --text-headline: 42px;
+    --text-headline--line-height: 1.18;
+    --text-headline-mobile: 32px;
+    --text-headline-mobile--line-height: 1.2;
+    --text-title: 21px;
+    --text-title--line-height: 1.3;
+    --text-body-serif: 17px;
+    --text-body-serif--line-height: 1.6;
+    --text-quote: 14.5px;
+    --text-quote--line-height: 1.6;
+    --text-finding: 13.5px;
+    --text-finding--line-height: 1.5;
+    --text-mono-ui: 12.5px;
+    --text-mono-ui--line-height: 1.4;
+    --text-mono-small: 11px;
+    --text-mono-small--line-height: 1.5;
+    --text-label: 12px;
+    --text-label--line-height: 1;
+    --text-colhead: 10px;
+    --text-colhead--line-height: 1;
+    --text-badge: 9.5px;
+    --text-badge--line-height: 1;
+
+    /* Letterspacing for the uppercase mono roles */
+    --tracking-label: 0.14em;
+    --tracking-colhead: 0.16em;
+    --tracking-badge: 0.1em;
+    --tracking-sev: 0.02em;
+
+    /* Containers + control metric */
+    --container-page: 880px;
+    --container-hero: 1160px;
+    --spacing-control: 46px;
+
+    /* radius — tight, technical (pill = the DISAGREES axis marker only) */
     --radius-badge: 3px;
     --radius-control: 4px;
     --radius-card: 6px;
     --radius-frame: 8px;
+    --radius-pill: 99px;
+
+    /* Sanctioned motion: fades only (terminal type-in arrives with M3) */
+    --animate-fade-in: fade-in 0.3s ease-out;
+
+    @keyframes fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
 
     /* the one dramatic shadow */
     --shadow-frame: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(242, 100, 48, 0.06);
@@ -73,6 +124,8 @@
     --color-sev-consider: var(--color-subtle);
     --color-voice-a: var(--color-ember);
     --color-voice-b: var(--color-amber);
+    --color-success: var(--color-amber);
+    --color-danger: var(--color-ember);
 }
 
 /* Non-utility tokens (gradients, tracking, metrics). */
@@ -85,8 +138,16 @@
 }
 
 @layer base {
+    :root {
+        color-scheme: dark;
+    }
+
     body {
-        @apply bg-surface text-body font-serif text-[17px] leading-relaxed;
+        @apply bg-surface text-body font-serif text-body-serif;
+    }
+
+    ::selection {
+        @apply bg-ember text-on-accent;
     }
 
     :focus-visible {
@@ -115,7 +176,7 @@
         @apply not-italic text-ember;
     }
     .o-nav-link {
-        @apply border-b border-transparent pb-[3px] font-mono text-[12.5px] leading-none text-muted no-underline transition-colors;
+        @apply border-b border-transparent pb-[3px] font-mono text-mono-ui leading-none text-muted no-underline transition-colors;
     }
     .o-nav-link:hover {
         @apply text-ink;
@@ -124,7 +185,7 @@
         @apply border-ember text-ink;
     }
     .o-footer {
-        @apply flex items-center justify-between border-t border-edge-soft px-6 py-[18px] font-mono text-[11px] leading-none text-subtle md:px-12;
+        @apply flex items-center justify-between border-t border-edge-soft px-6 py-[18px] font-mono text-mono-small leading-none text-subtle md:px-12;
     }
     .o-footer a {
         @apply text-subtle no-underline;
@@ -132,30 +193,21 @@
 
     /* ---- type roles ---- */
     .o-display {
-        @apply font-serif text-[38px] leading-[1.12] font-normal text-ink text-balance md:text-[54px] md:leading-[1.1];
+        @apply font-serif text-display-mobile font-normal text-ink text-balance md:text-display;
     }
     .o-headline {
-        @apply font-serif text-[32px] leading-[1.2] font-normal text-ink text-balance md:text-[42px] md:leading-[1.18];
+        @apply font-serif text-headline-mobile font-normal text-ink text-balance md:text-headline;
     }
     .o-title {
-        @apply font-serif italic text-[21px] leading-[1.3] font-normal text-ink;
-    }
-    .o-body-serif {
-        @apply font-serif text-[17px] leading-[1.6] text-body;
+        @apply font-serif italic text-title font-normal text-ink;
     }
     .o-label {
-        @apply font-mono text-[12px] font-medium uppercase leading-none text-faint tracking-[0.14em];
-    }
-    .o-mono-ui {
-        @apply font-mono text-[12.5px] leading-[1.4] text-muted;
-    }
-    .o-mono-small {
-        @apply font-mono text-[11px] leading-[1.5] text-subtle;
+        @apply font-mono text-label font-medium uppercase text-faint tracking-label;
     }
 
     /* ---- buttons & inputs ---- */
     .o-btn {
-        @apply inline-flex h-[46px] cursor-pointer items-center justify-center rounded-control border border-transparent bg-ember px-5 font-mono text-[13px] font-semibold leading-none text-on-accent no-underline transition-colors;
+        @apply inline-flex h-control cursor-pointer items-center justify-center rounded-control border border-transparent bg-ember px-5 font-mono text-[13px] font-semibold leading-none text-on-accent no-underline transition-colors;
     }
     .o-btn:hover {
         @apply bg-ember-bright;
@@ -167,18 +219,18 @@
         @apply border-ember bg-transparent text-ember;
     }
     .o-input {
-        @apply h-[46px] rounded-control border border-edge-strong bg-raised px-3.5 font-mono text-[13px] leading-none text-ink outline-none;
+        @apply h-control rounded-control border border-edge-strong bg-raised px-3.5 font-mono text-[13px] leading-none text-ink outline-none;
     }
     .o-input::placeholder {
         @apply text-faint;
     }
     .o-confirm-box {
-        @apply flex min-h-[46px] items-center gap-2.5 rounded-control border border-amber bg-voice-b-wash px-4 py-3 font-mono text-[13px] leading-[1.4] text-amber;
+        @apply flex min-h-control items-center gap-2.5 rounded-control border border-success bg-voice-b-wash px-4 py-3 font-mono text-[13px] leading-[1.4] text-success;
     }
 
     /* ---- severity & confidence ---- */
     .o-sev {
-        @apply inline-flex items-center gap-2 whitespace-nowrap font-mono text-[11px] font-semibold uppercase leading-none tracking-[0.02em];
+        @apply inline-flex items-center gap-2 whitespace-nowrap font-mono text-mono-small font-semibold uppercase leading-none tracking-sev;
     }
     .o-sev::before {
         content: "";
@@ -195,7 +247,7 @@
     }
 
     .o-conf {
-        @apply inline-block whitespace-nowrap rounded-badge font-mono text-[9.5px] font-semibold uppercase tracking-[0.1em];
+        @apply inline-block whitespace-nowrap rounded-badge font-mono text-badge font-semibold uppercase tracking-badge;
     }
     .o-conf-consensus {
         @apply bg-current px-2 py-[5px];
@@ -223,7 +275,7 @@
         @apply grid min-w-[640px] grid-cols-[118px_1fr_214px_116px] items-center gap-4;
     }
     .o-table-head {
-        @apply border-b border-edge bg-raised px-[18px] py-2.5 font-mono text-[10px] font-semibold uppercase leading-none text-faint tracking-[0.16em];
+        @apply border-b border-edge bg-raised px-[18px] py-2.5 font-mono text-colhead font-semibold uppercase text-faint tracking-colhead;
     }
     .o-table-row {
         @apply border-b border-hairline px-[18px] py-[15px] no-underline transition-colors;
@@ -235,13 +287,13 @@
         @apply bg-raised;
     }
     .o-finding-title {
-        @apply font-mono text-[13.5px] leading-[1.5] text-ink;
+        @apply font-mono text-finding text-ink;
     }
     .o-table-row[data-severity="consider"] .o-finding-title {
         @apply text-body;
     }
     .o-loc {
-        @apply overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] leading-[1.5] text-subtle;
+        @apply overflow-hidden text-ellipsis whitespace-nowrap font-mono text-mono-small text-subtle;
     }
 
     /* ---- finding detail articles ---- */
@@ -267,7 +319,7 @@
 
     /* ---- split / disagreement ---- */
     .o-split-badge {
-        @apply inline-block rounded-badge px-2 py-[5px] font-mono text-[9.5px] font-semibold uppercase text-on-accent tracking-[0.14em];
+        @apply inline-block rounded-badge px-2 py-[5px] font-mono text-badge font-semibold uppercase text-on-accent tracking-label;
         background: var(--gradient-split-badge);
     }
     .o-disagreement {
@@ -297,10 +349,10 @@
         @apply md:border-t;
     }
     .o-meta-label {
-        @apply font-mono text-[9.5px] font-semibold uppercase leading-none text-faint tracking-[0.14em];
+        @apply font-mono text-badge font-semibold uppercase text-faint tracking-label;
     }
     .o-meta-value {
-        @apply font-mono text-[12.5px] leading-[1.4] text-ink [overflow-wrap:anywhere];
+        @apply font-mono text-mono-ui text-ink [overflow-wrap:anywhere];
     }
     .o-meta-value.is-accent {
         @apply font-semibold text-ember;
@@ -315,13 +367,13 @@
         background: var(--gradient-card);
     }
     .o-card-kicker {
-        @apply flex items-baseline justify-between gap-3 font-mono text-[10px] font-medium uppercase leading-none text-faint tracking-[0.14em];
+        @apply flex items-baseline justify-between gap-3 font-mono text-colhead font-medium uppercase text-faint tracking-label;
     }
     .o-card-headline {
         @apply font-serif italic text-[20px] leading-[1.3] text-ink text-pretty;
     }
     .o-card-foot {
-        @apply mt-1 flex items-center justify-between gap-3 font-mono text-[11px] leading-none text-subtle;
+        @apply mt-1 flex items-center justify-between gap-3 font-mono text-mono-small leading-none text-subtle;
     }
     .o-card-cost {
         @apply whitespace-nowrap font-semibold text-ember;
@@ -332,7 +384,7 @@
         @apply overflow-hidden rounded-frame border border-edge bg-sunken shadow-frame;
     }
     .o-docket-bar {
-        @apply flex items-center gap-[7px] border-b border-edge-soft px-4 py-3 font-mono text-[11px] leading-none text-muted;
+        @apply flex items-center gap-[7px] border-b border-edge-soft px-4 py-3 font-mono text-mono-small leading-none text-muted;
     }
     .o-docket-dot {
         @apply size-2.5 flex-none rounded-full bg-edge;
@@ -344,10 +396,10 @@
         @apply font-mono text-[11px] font-semibold leading-none;
     }
     .o-docket-text {
-        @apply font-serif italic text-[14.5px] leading-[1.5] text-body;
+        @apply font-serif italic text-quote text-body;
     }
     .o-docket-foot {
-        @apply flex items-center justify-between gap-3 bg-raised px-[22px] py-3.5 font-mono text-[11px] leading-none text-subtle;
+        @apply flex items-center justify-between gap-3 bg-raised px-[22px] py-3.5 font-mono text-mono-small leading-none text-subtle;
     }
 
     /* ---- hero glow ---- */
