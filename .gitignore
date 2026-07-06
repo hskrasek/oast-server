@@ -26,5 +26,5 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 
-# session artifacts
-*.png
+# session artifacts (repo root only)
+/*.png
