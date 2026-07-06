@@ -61,14 +61,13 @@
                 <div>location</div>
                 <div class="text-right">confidence</div>
             </div>
-            @foreach ($publication->findings as $i => $finding)
-            <a href="#finding-{{ $i + 1 }}" class="o-table-row" data-severity="{{ $finding['severity'] ?? '' }}">
-                <span class="o-sev o-sev-{{ $finding['severity'] ?? 'consider' }}">{{ $finding['severity'] ?? '' }}</span>
+            @foreach ($publication->findings as $finding)
+            <a href="#finding-{{ $loop->iteration }}" class="o-table-row" data-severity="{{ $finding['severity'] ?? '' }}">
+                <x-site.severity :severity="$finding['severity'] ?? 'consider'" />
                 <span class="o-finding-title">{{ $finding['title'] ?? '' }}</span>
                 <span class="o-loc" title="{{ $finding['location'] ?? '' }}">{{ $finding['location'] ?? '' }}</span>
                 <span class="flex justify-end">
-                    @php($conf = $finding['confidence'] ?? 'lone-flag')
-                    <span class="o-conf o-conf-{{ $conf }} o-sev-{{ $finding['severity'] ?? 'consider' }}"><span class="o-conf-text">{{ $conf }}</span></span>
+                    <x-site.confidence :confidence="$finding['confidence'] ?? 'lone-flag'" :severity="$finding['severity'] ?? 'consider'" />
                 </span>
             </a>
             @endforeach
@@ -77,20 +76,15 @@
 
     <!-- Finding detail -->
     <section class="flex flex-col gap-6">
-        @foreach ($publication->findings as $i => $finding)
-        <article id="finding-{{ $i + 1 }}" class="o-finding">
+        @foreach ($publication->findings as $finding)
+        <article id="finding-{{ $loop->iteration }}" class="o-finding">
             <header class="o-finding-header">
                 <div class="flex items-center gap-3">
-                    <span class="o-sev o-sev-{{ $finding['severity'] ?? 'consider' }}">{{ $finding['severity'] ?? '' }}</span>
-                    @php($conf = $finding['confidence'] ?? 'lone-flag')
-                    @if ($conf === 'split')
-                    <span class="o-split-badge">split</span>
-                    @else
-                    <span class="o-conf o-conf-{{ $conf }} o-sev-{{ $finding['severity'] ?? 'consider' }}"><span class="o-conf-text">{{ $conf }}</span></span>
-                    @endif
+                    <x-site.severity :severity="$finding['severity'] ?? 'consider'" />
+                    <x-site.confidence :confidence="$finding['confidence'] ?? 'lone-flag'" :severity="$finding['severity'] ?? 'consider'" />
                 </div>
                 <h3 class="o-title">{{ $finding['title'] ?? '' }}</h3>
-                <code class="o-loc !whitespace-normal">{{ $finding['location'] ?? '' }}</code>
+                <code class="o-loc whitespace-normal">{{ $finding['location'] ?? '' }}</code>
             </header>
 
             <div class="o-finding-body">

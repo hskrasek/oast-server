@@ -9,6 +9,6 @@
         <span class="font-semibold">→</span>
         <span>Subscription confirmed for {{ $email }}. See you at launch.</span>
     </div>
-    <p><a href="{{ route('reviews.index') }}" class="o-mono-ui" style="color: var(--text-2)">read the published reviews →</a></p>
+    <p><a href="{{ route('reviews.index') }}" class="o-mono-ui">read the published reviews →</a></p>
 </div>
 @endsection

@@ -1,5 +1,12 @@
 @import "tailwindcss";
-@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap");
+
+/* Self-hosted fonts (Fontsource) — no third-party font requests. */
+@import "@fontsource-variable/newsreader/opsz.css";
+@import "@fontsource-variable/newsreader/opsz-italic.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/ibm-plex-mono/400-italic.css";
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
@@ -8,431 +15,345 @@
 /* oast.sh design tokens — synced from the Claude Design project      */
 /* "Oast.sh API design review" (terminal kiln + editorial serif).     */
 /* Severity IS the heat scale; confidence is weight/texture, not hue. */
+/* Registered via @theme so every token is a Tailwind utility.        */
 /* ------------------------------------------------------------------ */
-:root {
+@theme {
     /* base surfaces (warm charcoal, never pure black) */
-    --bg-0: #171310;
-    --bg-1: #1e1915;
-    --bg-2: #12100c;
+    --color-bg-0: #171310;
+    --color-bg-1: #1e1915;
+    --color-bg-2: #12100c;
 
     /* borders */
-    --border-1: #332a21;
-    --border-0: #26201a;
-    --border-row: rgba(38, 32, 25, 0.62);
-    --border-input: #3d3227;
+    --color-border-1: #332a21;
+    --color-border-0: #26201a;
+    --color-border-row: rgba(38, 32, 25, 0.62);
+    --color-border-input: #3d3227;
 
     /* text */
-    --text-1: #ede4d8;
-    --text-body: #c5b8a7;
-    --text-2: #a89a89;
-    --text-3: #8f7f6c;
-    --text-4: #6f6355;
+    --color-text-1: #ede4d8;
+    --color-text-body: #c5b8a7;
+    --color-text-2: #a89a89;
+    --color-text-3: #8f7f6c;
+    --color-text-4: #6f6355;
 
     /* heat accents */
-    --ember: #f26430;
-    --ember-bright: #ff7b47;
-    --amber: #dda032;
-    --copper: #c5852f;
-    --neutral-flag: #8f7f6c;
+    --color-ember: #f26430;
+    --color-ember-bright: #ff7b47;
+    --color-amber: #dda032;
+    --color-copper: #c5852f;
+    --color-neutral-flag: #8f7f6c;
+    --color-on-accent: #171310;
 
-    /* semantic: severity */
-    --sev-blocker: var(--ember);
-    --sev-should-fix: var(--amber);
-    --sev-consider: var(--neutral-flag);
-
-    /* semantic: split voices */
-    --voice-a: var(--ember);
-    --voice-b: var(--amber);
-    --voice-a-wash: rgba(242, 100, 48, 0.04);
-    --voice-b-wash: rgba(221, 160, 50, 0.04);
-
-    --text-on-accent: #171310;
-
-    /* heat glow */
-    --glow-hero: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(242, 100, 48, 0.13) 0%, transparent 65%);
-    --glow-horizon-line: linear-gradient(90deg, transparent, rgba(242, 100, 48, 0.55), transparent);
-    --gradient-card: linear-gradient(180deg, #1e1915 0%, #171310 100%);
-    --gradient-split-badge: linear-gradient(90deg, var(--ember) 50%, var(--amber) 50%);
+    /* split-voice washes */
+    --color-voice-a-wash: rgba(242, 100, 48, 0.04);
+    --color-voice-b-wash: rgba(221, 160, 50, 0.04);
 
     /* type */
-    --font-serif: "Newsreader", Georgia, serif;
+    --font-serif: "Newsreader Variable", Georgia, serif;
     --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
-    --tracking-label: 0.14em;
-    --tracking-colhead: 0.16em;
-    --tracking-badge: 0.1em;
 
-    /* radius */
+    /* radius — tight, technical */
     --radius-badge: 3px;
     --radius-control: 4px;
     --radius-card: 6px;
     --radius-frame: 8px;
-    --radius-pill: 99px;
 
-    /* metrics */
-    --control-h: 46px;
-    --cell-pad: 15px 18px;
-    --page-max: 880px;
-
+    /* the one dramatic shadow */
     --shadow-frame: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(242, 100, 48, 0.06);
+}
+
+/* Semantic aliases resolve against theme tokens. */
+@theme inline {
+    --color-sev-blocker: var(--color-ember);
+    --color-sev-should-fix: var(--color-amber);
+    --color-sev-consider: var(--color-neutral-flag);
+    --color-voice-a: var(--color-ember);
+    --color-voice-b: var(--color-amber);
+}
+
+/* Non-utility tokens (gradients, tracking, metrics). */
+:root {
+    --glow-hero: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(242, 100, 48, 0.13) 0%, transparent 65%);
+    --glow-horizon-line: linear-gradient(90deg, transparent, rgba(242, 100, 48, 0.55), transparent);
+    --gradient-card: linear-gradient(180deg, #1e1915 0%, #171310 100%);
+    --gradient-split-badge: linear-gradient(90deg, var(--color-ember) 50%, var(--color-amber) 50%);
+
 }
 
 @layer base {
     body {
-        background: var(--bg-0);
-        color: var(--text-body);
-        font: 400 17px/1.6 var(--font-serif);
+        @apply bg-bg-0 text-text-body font-serif text-[17px] leading-relaxed;
+    }
+
+    :focus-visible {
+        @apply outline-2 outline-offset-2 outline-ember;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        ::before,
+        ::after {
+            transition-duration: 0.01ms !important;
+            animation-duration: 0.01ms !important;
+        }
     }
 }
 
 @layer components {
     /* ---- chrome ---- */
     .o-nav {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 22px 48px;
-        border-bottom: 1px solid var(--border-0);
-        background: var(--bg-0);
+        @apply flex items-center justify-between border-b border-border-0 bg-bg-0 px-6 py-[22px] md:px-12;
     }
     .o-wordmark {
-        font: 600 17px/1 var(--font-mono);
-        color: var(--text-1);
-        text-decoration: none;
+        @apply font-mono text-[17px] font-semibold leading-none text-text-1 no-underline;
     }
     .o-wordmark em {
-        font-style: normal;
-        color: var(--ember);
+        @apply not-italic text-ember;
     }
     .o-nav-link {
-        font: 400 12.5px/1 var(--font-mono);
-        color: var(--text-2);
-        text-decoration: none;
-        border-bottom: 1px solid transparent;
-        padding-bottom: 3px;
-        transition: color 0.12s;
+        @apply border-b border-transparent pb-[3px] font-mono text-[12.5px] leading-none text-text-2 no-underline transition-colors;
     }
-    .o-nav-link:hover { color: var(--text-1); }
+    .o-nav-link:hover {
+        @apply text-text-1;
+    }
     .o-nav-link[aria-current="page"] {
-        color: var(--text-1);
-        border-bottom-color: var(--ember);
+        @apply border-ember text-text-1;
     }
     .o-footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 18px 48px;
-        border-top: 1px solid var(--border-0);
-        font: 400 11px/1 var(--font-mono);
-        color: var(--text-4);
+        @apply flex items-center justify-between border-t border-border-0 px-6 py-[18px] font-mono text-[11px] leading-none text-text-3 md:px-12;
     }
-    .o-footer a { color: var(--text-4); text-decoration: none; }
+    .o-footer a {
+        @apply text-text-3 no-underline;
+    }
 
     /* ---- type roles ---- */
-    .o-display { font: 400 54px/1.1 var(--font-serif); color: var(--text-1); text-wrap: balance; }
-    .o-headline { font: 400 42px/1.18 var(--font-serif); color: var(--text-1); text-wrap: balance; }
-    .o-title { font: italic 400 21px/1.3 var(--font-serif); color: var(--text-1); }
-    .o-body-serif { font: 400 17px/1.6 var(--font-serif); color: var(--text-body); }
-    .o-label {
-        font: 500 12px/1 var(--font-mono);
-        letter-spacing: var(--tracking-label);
-        text-transform: uppercase;
-        color: var(--text-4);
+    .o-display {
+        @apply font-serif text-[38px] leading-[1.12] font-normal text-text-1 text-balance md:text-[54px] md:leading-[1.1];
     }
-    .o-mono-ui { font: 400 12.5px/1.4 var(--font-mono); color: var(--text-2); }
-    .o-mono-small { font: 400 11px/1.5 var(--font-mono); color: var(--text-3); }
+    .o-headline {
+        @apply font-serif text-[32px] leading-[1.2] font-normal text-text-1 text-balance md:text-[42px] md:leading-[1.18];
+    }
+    .o-title {
+        @apply font-serif italic text-[21px] leading-[1.3] font-normal text-text-1;
+    }
+    .o-body-serif {
+        @apply font-serif text-[17px] leading-[1.6] text-text-body;
+    }
+    .o-label {
+        @apply font-mono text-[12px] font-medium uppercase leading-none text-text-4 tracking-[0.14em];
+    }
+    .o-mono-ui {
+        @apply font-mono text-[12.5px] leading-[1.4] text-text-2;
+    }
+    .o-mono-small {
+        @apply font-mono text-[11px] leading-[1.5] text-text-3;
+    }
 
     /* ---- buttons & inputs ---- */
     .o-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        height: var(--control-h);
-        padding: 0 20px;
-        border-radius: var(--radius-control);
-        font: 600 13px/1 var(--font-mono);
-        cursor: pointer;
-        transition: background 0.12s, border-color 0.12s, color 0.12s;
-        background: var(--ember);
-        color: var(--text-on-accent);
-        border: 1px solid transparent;
+        @apply inline-flex h-[46px] cursor-pointer items-center justify-center rounded-control border border-transparent bg-ember px-5 font-mono text-[13px] font-semibold leading-none text-on-accent no-underline transition-colors;
     }
-    .o-btn:hover { background: var(--ember-bright); }
+    .o-btn:hover {
+        @apply bg-ember-bright;
+    }
     .o-btn-outline {
-        background: transparent;
-        color: var(--text-1);
-        border: 1px solid var(--border-input);
+        @apply border-border-input bg-transparent text-text-1;
     }
-    .o-btn-outline:hover { background: transparent; border-color: var(--ember); color: var(--ember); }
+    .o-btn-outline:hover {
+        @apply border-ember bg-transparent text-ember;
+    }
     .o-input {
-        height: var(--control-h);
-        padding: 0 14px;
-        border: 1px solid var(--border-input);
-        border-radius: var(--radius-control);
-        background: var(--bg-1);
-        font: 400 13px/1 var(--font-mono);
-        color: var(--text-1);
-        outline: none;
+        @apply h-[46px] rounded-control border border-border-input bg-bg-1 px-3.5 font-mono text-[13px] leading-none text-text-1 outline-none;
     }
-    .o-input::placeholder { color: var(--text-4); }
+    .o-input::placeholder {
+        @apply text-text-4;
+    }
     .o-confirm-box {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        min-height: var(--control-h);
-        padding: 12px 16px;
-        border: 1px solid var(--amber);
-        border-radius: var(--radius-control);
-        background: var(--voice-b-wash);
-        font: 400 13px/1.4 var(--font-mono);
-        color: var(--amber);
+        @apply flex min-h-[46px] items-center gap-2.5 rounded-control border border-amber bg-voice-b-wash px-4 py-3 font-mono text-[13px] leading-[1.4] text-amber;
     }
 
     /* ---- severity & confidence ---- */
     .o-sev {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        font: 600 11px/1 var(--font-mono);
-        text-transform: uppercase;
-        letter-spacing: 0.02em;
-        white-space: nowrap;
+        @apply inline-flex items-center gap-2 whitespace-nowrap font-mono text-[11px] font-semibold uppercase leading-none tracking-[0.02em];
     }
     .o-sev::before {
         content: "";
-        width: 8px;
-        height: 8px;
-        border-radius: 2px;
-        background: currentColor;
-        flex: none;
+        @apply size-2 flex-none rounded-[2px] bg-current;
     }
-    .o-sev-blocker { color: var(--sev-blocker); }
-    .o-sev-should-fix { color: var(--sev-should-fix); }
-    .o-sev-consider { color: var(--sev-consider); }
+    .o-sev-blocker {
+        @apply text-sev-blocker;
+    }
+    .o-sev-should-fix {
+        @apply text-sev-should-fix;
+    }
+    .o-sev-consider {
+        @apply text-sev-consider;
+    }
 
     .o-conf {
-        display: inline-block;
-        font: 600 9.5px/1 var(--font-mono);
-        letter-spacing: var(--tracking-badge);
-        border-radius: var(--radius-badge);
-        text-transform: uppercase;
-        white-space: nowrap;
+        @apply inline-block whitespace-nowrap rounded-badge font-mono text-[9.5px] font-semibold uppercase tracking-[0.1em];
     }
-    .o-conf-consensus.o-sev-blocker, .o-conf-consensus.o-sev-should-fix, .o-conf-consensus.o-sev-consider {
-        padding: 5px 8px;
-        background: currentColor;
+    .o-conf-consensus {
+        @apply bg-current px-2 py-[5px];
     }
-    .o-conf-consensus .o-conf-text { color: var(--text-on-accent); }
-    .o-conf-majority { padding: 4px 7px; border: 1.5px solid currentColor; }
-    .o-conf-lone-flag { padding: 4px 7px; border: 1px dashed currentColor; opacity: 0.85; }
+    .o-conf-consensus .o-conf-text {
+        @apply text-on-accent;
+    }
+    .o-conf-majority {
+        @apply border-[1.5px] border-current px-[7px] py-1;
+    }
+    .o-conf-lone-flag {
+        @apply border border-dashed border-current px-[7px] py-1 opacity-85;
+    }
     .o-conf-split {
-        padding: 5px 8px;
+        @apply px-2 py-[5px] text-on-accent;
         background: var(--gradient-split-badge);
-        color: var(--text-on-accent);
     }
 
     /* ---- findings table ---- */
     .o-table {
-        border: 1px solid var(--border-1);
-        border-radius: var(--radius-card);
-        overflow: hidden;
+        @apply overflow-x-auto rounded-card border border-border-1;
     }
-    .o-table-head, .o-table-row {
-        display: grid;
-        grid-template-columns: 118px 1fr 214px 116px;
-        gap: 16px;
-        align-items: center;
+    .o-table-head,
+    .o-table-row {
+        @apply grid min-w-[640px] grid-cols-[118px_1fr_214px_116px] items-center gap-4;
     }
     .o-table-head {
-        padding: 10px 18px;
-        background: var(--bg-1);
-        border-bottom: 1px solid var(--border-1);
-        font: 600 10px/1 var(--font-mono);
-        letter-spacing: var(--tracking-colhead);
-        text-transform: uppercase;
-        color: var(--text-4);
+        @apply border-b border-border-1 bg-bg-1 px-[18px] py-2.5 font-mono text-[10px] font-semibold uppercase leading-none text-text-4 tracking-[0.16em];
     }
     .o-table-row {
-        padding: var(--cell-pad);
-        border-bottom: 1px solid var(--border-row);
-        transition: background 0.12s;
-        text-decoration: none;
+        @apply border-b border-border-row px-[18px] py-[15px] no-underline transition-colors;
     }
-    .o-table-row:last-child { border-bottom: none; }
-    .o-table-row:hover { background: var(--bg-1); }
-    .o-finding-title { font: 400 13.5px/1.5 var(--font-mono); color: var(--text-1); }
-    .o-table-row[data-severity="consider"] .o-finding-title { color: var(--text-body); }
+    .o-table-row:last-child {
+        @apply border-b-0;
+    }
+    .o-table-row:hover {
+        @apply bg-bg-1;
+    }
+    .o-finding-title {
+        @apply font-mono text-[13.5px] leading-[1.5] text-text-1;
+    }
+    .o-table-row[data-severity="consider"] .o-finding-title {
+        @apply text-text-body;
+    }
     .o-loc {
-        font: 400 11px/1.5 var(--font-mono);
-        color: var(--text-3);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        @apply overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] leading-[1.5] text-text-3;
     }
 
     /* ---- finding detail articles ---- */
     .o-finding {
-        border: 1px solid var(--border-1);
-        border-radius: var(--radius-card);
+        @apply overflow-hidden rounded-card border border-border-1;
         background: var(--gradient-card);
-        overflow: hidden;
     }
     .o-finding-header {
-        padding: 18px 22px 16px;
-        border-bottom: 1px solid var(--border-1);
-        display: flex;
-        flex-direction: column;
-        gap: 9px;
+        @apply flex flex-col gap-[9px] border-b border-border-1 px-[22px] pb-4 pt-[18px];
     }
-    .o-finding-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
-    .o-finding-body p { font: 400 15px/1.65 var(--font-serif); color: var(--text-body); }
-    .o-finding-why { color: var(--text-3); }
+    .o-finding-body {
+        @apply flex flex-col gap-3.5 px-[22px] py-5;
+    }
+    :where(.o-finding-body) p {
+        @apply font-serif text-[15px] leading-[1.65] text-text-body;
+    }
+    .o-finding-why {
+        @apply text-text-3;
+    }
     .o-suggest {
-        font: 400 12.5px/1.6 var(--font-mono);
-        color: var(--text-2);
-        padding: 13px 16px;
-        background: var(--bg-2);
-        border: 1px solid var(--border-0);
-        border-radius: var(--radius-control);
+        @apply rounded-control border border-border-0 bg-bg-2 px-4 py-[13px] font-mono text-[12.5px] leading-[1.6] text-text-2;
     }
 
     /* ---- split / disagreement ---- */
     .o-split-badge {
-        display: inline-block;
-        font: 600 9.5px/1 var(--font-mono);
-        letter-spacing: var(--tracking-label);
-        padding: 5px 8px;
-        border-radius: var(--radius-badge);
+        @apply inline-block rounded-badge px-2 py-[5px] font-mono text-[9.5px] font-semibold uppercase text-on-accent tracking-[0.14em];
         background: var(--gradient-split-badge);
-        color: var(--text-on-accent);
-        text-transform: uppercase;
     }
     .o-disagreement {
-        margin: 0;
-        padding: 16px 18px;
-        border-left: 2px solid var(--voice-a);
-        background: var(--voice-a-wash);
-        border-radius: 2px 6px 6px 2px;
-        font: 400 15px/1.65 var(--font-serif);
-        color: var(--text-body);
+        @apply m-0 rounded-[2px_6px_6px_2px] border-l-2 border-voice-a bg-voice-a-wash px-[18px] py-4 font-serif text-[15px] leading-[1.65] text-text-body;
     }
     .o-split-foot {
-        font: 400 11.5px/1.5 var(--font-mono);
-        color: var(--text-3);
+        @apply font-mono text-[11.5px] leading-[1.5] text-text-3;
     }
 
     /* ---- meta strip ---- */
     .o-meta {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        border: 1px solid var(--border-1);
-        border-radius: var(--radius-card);
-        overflow: hidden;
-        background: var(--bg-1);
+        @apply grid grid-cols-2 overflow-hidden rounded-card border border-border-1 bg-bg-1 md:grid-cols-4;
     }
     .o-meta-cell {
-        padding: 14px 18px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        min-width: 0;
-        border-right: 1px solid var(--border-0);
+        @apply flex min-w-0 flex-col gap-1.5 border-r border-border-0 px-[18px] py-3.5;
     }
-    .o-meta-cell:nth-child(4n) { border-right: none; }
-    .o-meta-cell:nth-child(n + 5) { border-top: 1px solid var(--border-0); }
+    .o-meta-cell:nth-child(2n) {
+        @apply border-r-0 md:border-r;
+    }
+    .o-meta-cell:nth-child(4n) {
+        @apply md:border-r-0;
+    }
+    .o-meta-cell:nth-child(n + 3) {
+        @apply border-t border-border-0 md:border-t-0;
+    }
+    .o-meta-cell:nth-child(n + 5) {
+        @apply md:border-t;
+    }
     .o-meta-label {
-        font: 600 9.5px/1 var(--font-mono);
-        letter-spacing: var(--tracking-label);
-        color: var(--text-4);
-        text-transform: uppercase;
+        @apply font-mono text-[9.5px] font-semibold uppercase leading-none text-text-4 tracking-[0.14em];
     }
-    .o-meta-value { font: 400 12.5px/1.4 var(--font-mono); color: var(--text-1); overflow-wrap: anywhere; }
-    .o-meta-value.is-accent { font-weight: 600; color: var(--ember); }
+    .o-meta-value {
+        @apply font-mono text-[12.5px] leading-[1.4] text-text-1 [overflow-wrap:anywhere];
+    }
+    .o-meta-value.is-accent {
+        @apply font-semibold text-ember;
+    }
 
     /* ---- review cards ---- */
     .o-card {
-        border: 1px solid var(--border-1);
-        border-radius: var(--radius-card);
-        background: var(--bg-0);
-        padding: 22px 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        text-decoration: none;
-        transition: background 0.12s, border-color 0.12s;
+        @apply flex flex-col gap-3 rounded-card border border-border-1 bg-bg-0 px-6 py-[22px] no-underline transition-colors;
     }
-    .o-card:hover { background: var(--gradient-card); border-color: var(--border-input); }
+    .o-card:hover {
+        @apply border-border-input;
+        background: var(--gradient-card);
+    }
     .o-card-kicker {
-        display: flex;
-        justify-content: space-between;
-        align-items: baseline;
-        gap: 12px;
-        font: 500 10px/1 var(--font-mono);
-        letter-spacing: var(--tracking-label);
-        color: var(--text-4);
-        text-transform: uppercase;
+        @apply flex items-baseline justify-between gap-3 font-mono text-[10px] font-medium uppercase leading-none text-text-4 tracking-[0.14em];
     }
-    .o-card-headline { font: italic 400 20px/1.3 var(--font-serif); color: var(--text-1); text-wrap: pretty; }
+    .o-card-headline {
+        @apply font-serif italic text-[20px] leading-[1.3] text-text-1 text-pretty;
+    }
     .o-card-foot {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        margin-top: 4px;
-        font: 400 11px/1 var(--font-mono);
-        color: var(--text-3);
+        @apply mt-1 flex items-center justify-between gap-3 font-mono text-[11px] leading-none text-text-3;
     }
-    .o-card-cost { font-weight: 600; color: var(--ember); white-space: nowrap; }
+    .o-card-cost {
+        @apply whitespace-nowrap font-semibold text-ember;
+    }
 
     /* ---- terminal / docket ---- */
     .o-docket {
-        border: 1px solid var(--border-1);
-        border-radius: var(--radius-frame);
-        background: var(--bg-2);
-        box-shadow: var(--shadow-frame);
-        overflow: hidden;
+        @apply overflow-hidden rounded-frame border border-border-1 bg-bg-2 shadow-frame;
     }
     .o-docket-bar {
-        display: flex;
-        align-items: center;
-        gap: 7px;
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--border-0);
-        font: 400 11px/1 var(--font-mono);
-        color: var(--text-2);
+        @apply flex items-center gap-[7px] border-b border-border-0 px-4 py-3 font-mono text-[11px] leading-none text-text-2;
     }
-    .o-docket-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--border-1); flex: none; }
+    .o-docket-dot {
+        @apply size-2.5 flex-none rounded-full bg-border-1;
+    }
     .o-docket-quote {
-        padding: 20px 22px;
-        border-bottom: 1px solid var(--border-0);
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+        @apply flex flex-col gap-2 border-b border-border-0 px-[22px] py-5;
     }
-    .o-docket-model { font: 600 11px/1 var(--font-mono); }
-    .o-docket-text { font: italic 400 14.5px/1.5 var(--font-serif); color: var(--text-body); }
+    .o-docket-model {
+        @apply font-mono text-[11px] font-semibold leading-none;
+    }
+    .o-docket-text {
+        @apply font-serif italic text-[14.5px] leading-[1.5] text-text-body;
+    }
     .o-docket-foot {
-        padding: 14px 22px;
-        background: var(--bg-1);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        font: 400 11px/1 var(--font-mono);
-        color: var(--text-3);
+        @apply flex items-center justify-between gap-3 bg-bg-1 px-[22px] py-3.5 font-mono text-[11px] leading-none text-text-3;
     }
 
     /* ---- hero glow ---- */
     .o-hero {
-        position: relative;
+        @apply relative;
         background: var(--glow-hero);
     }
     .o-hero::after {
         content: "";
-        position: absolute;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        height: 1px;
+        @apply absolute inset-x-0 bottom-0 h-px;
         background: var(--glow-horizon-line);
     }
 }

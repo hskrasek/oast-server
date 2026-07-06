@@ -11,20 +11,7 @@
 
     <div class="grid gap-4 md:grid-cols-2">
         @foreach ($publications as $publication)
-        @php($counts = $publication->findingCounts())
-        <a href="{{ route('reviews.show', $publication->slug) }}" class="o-card">
-            <span class="o-card-kicker">
-                <span>{{ $publication->specName }} · {{ $publication->dimension }}</span>
-                <span class="normal-case tracking-normal">{{ $publication->reviewedAt->format('M d, Y') }}</span>
-            </span>
-            <span class="o-card-headline">{{ $publication->headline }}</span>
-            <span class="o-card-foot">
-                <span>{{ $counts['blocker'] }} blocker · {{ $counts['should-fix'] }} should-fix · {{ $counts['consider'] }} consider</span>
-                @if ($cost = $publication->totalCostUsd())
-                <span class="o-card-cost">${{ number_format($cost, 2) }}</span>
-                @endif
-            </span>
-        </a>
+        <x-site.review-card :publication="$publication" :show-date="true" />
         @endforeach
     </div>
 </div>
