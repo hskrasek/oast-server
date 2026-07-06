@@ -3,26 +3,27 @@
 @section('title', 'Reviews - oast')
 
 @section('content')
-<div class="max-w-6xl mx-auto px-4 py-12">
-    <h1 class="text-4xl font-bold mb-8">Published Reviews</h1>
+<div class="mx-auto max-w-[880px] px-6 py-16 flex flex-col gap-8">
+    <header class="flex flex-col gap-3">
+        <h1 class="o-headline">Published Reviews</h1>
+        <p class="o-mono-small">real Council output · real specs · real costs</p>
+    </header>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="grid gap-4 md:grid-cols-2">
         @foreach ($publications as $publication)
-        <a href="{{ route('reviews.show', $publication->slug) }}" class="border border-gray-300 p-6 rounded hover:shadow-lg transition">
-            <h2 class="text-2xl font-bold mb-2">{{ $publication->specName }}</h2>
-            <p class="text-gray-600 mb-4">{{ $publication->headline }}</p>
-
-            <div class="space-y-2 text-sm text-gray-500">
-                <p><strong>Dimension:</strong> {{ $publication->dimension }}</p>
-                @php
-                    $counts = $publication->findingCounts();
-                @endphp
-                <p><strong>Findings:</strong> {{ $counts['blocker'] }} blocker, {{ $counts['should-fix'] }} should-fix, {{ $counts['consider'] }} consider</p>
+        @php($counts = $publication->findingCounts())
+        <a href="{{ route('reviews.show', $publication->slug) }}" class="o-card">
+            <span class="o-card-kicker">
+                <span>{{ $publication->specName }} · {{ $publication->dimension }}</span>
+                <span class="normal-case tracking-normal">{{ $publication->reviewedAt->format('M d, Y') }}</span>
+            </span>
+            <span class="o-card-headline">{{ $publication->headline }}</span>
+            <span class="o-card-foot">
+                <span>{{ $counts['blocker'] }} blocker · {{ $counts['should-fix'] }} should-fix · {{ $counts['consider'] }} consider</span>
                 @if ($cost = $publication->totalCostUsd())
-                <p><strong>Cost:</strong> ${{ number_format($cost, 2) }}</p>
+                <span class="o-card-cost">${{ number_format($cost, 2) }}</span>
                 @endif
-                <p><strong>Reviewed:</strong> {{ $publication->reviewedAt->format('M d, Y') }}</p>
-            </div>
+            </span>
         </a>
         @endforeach
     </div>

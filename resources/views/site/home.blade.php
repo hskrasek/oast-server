@@ -1,44 +1,120 @@
 @extends('site.layout')
 
 @section('content')
-<div class="max-w-6xl mx-auto px-4 py-12">
-    <!-- Hero -->
-    <section class="mb-16">
-        <h1 class="text-5xl font-bold mb-4">Your API design, argued over by a panel that never gets tired.</h1>
-    </section>
+<!-- Hero -->
+<section class="o-hero">
+    <div class="mx-auto max-w-[1160px] px-6 lg:px-12 py-20 lg:py-24 grid gap-14 lg:grid-cols-[1fr_540px] items-center">
+        <div class="flex flex-col gap-7">
+            <h1 class="o-display">Your API design, argued over by a panel that never gets tired.</h1>
+            <p class="o-body-serif max-w-[46ch]">Spectral tells you an operationId is missing. Nobody tells you your resource model leaks the database, your payment flow can't be retried safely, or your 'REST' API is RPC in a trench coat — until clients depend on it.</p>
+            <div class="flex items-center gap-4">
+                <a href="#notify" class="o-btn">Notify me</a>
+                <a href="{{ route('reviews.index') }}" class="o-btn o-btn-outline">read the reviews →</a>
+            </div>
+        </div>
+        <div class="o-docket">
+            <div class="o-docket-bar">
+                <span class="o-docket-dot"></span><span class="o-docket-dot"></span><span class="o-docket-dot"></span>
+                <span class="ml-3">$ oast roast ./slack-web-api.yaml</span>
+                <span class="ml-auto text-[10.5px]" style="color: var(--text-4)">oast v0.4</span>
+            </div>
+            <div class="o-docket-quote">
+                <span class="o-docket-model" style="color: var(--ember)">claude-sonnet</span>
+                <span class="o-docket-text">&ldquo;The entire API is an RPC method catalog rather than a resource model.&rdquo;</span>
+            </div>
+            <div class="o-docket-quote">
+                <span class="o-docket-model" style="color: var(--amber)">gpt-5.5</span>
+                <span class="o-docket-text">&ldquo;Payment modeled as a write-only singleton action — no retrieval, no history.&rdquo;</span>
+            </div>
+            <div class="o-docket-quote">
+                <span class="o-docket-model" style="color: var(--copper)">glm-5.2</span>
+                <span class="o-docket-text">&ldquo;Two competing pagination styles reveal API evolution, not design.&rdquo;</span>
+            </div>
+            <div class="o-docket-foot">
+                <span>judge: claude-opus → 16 findings · 3 consensus</span>
+                <span style="color: var(--text-1)">$2.59 · 3m41s</span>
+            </div>
+        </div>
+    </div>
+</section>
 
-    <!-- Problem -->
-    <section class="mb-16">
-        <h2 class="text-3xl font-bold mb-4">The Problem</h2>
-        <p class="text-lg">Spectral tells you an operationId is missing. Nobody tells you your resource model leaks the database, your payment flow can't be retried safely, or your 'REST' API is RPC in a trench coat — until clients depend on it.</p>
-    </section>
-
+<div class="mx-auto max-w-[880px] px-6 flex flex-col gap-20 py-20">
     <!-- How It Works -->
-    <section class="mb-16">
-        <h2 class="text-3xl font-bold mb-4">How It Works</h2>
-        <ol class="text-lg space-y-4">
-            <li><strong>1.</strong> Three frontier models critique your spec independently — no shared rubric, no groupthink.</li>
-            <li><strong>2.</strong> A judge model organizes their critiques into findings — it never adds its own.</li>
-            <li><strong>3.</strong> Every finding carries severity (blocker / should-fix / consider) and confidence (consensus / majority / split / lone-flag).</li>
+    <section class="flex flex-col gap-6">
+        <h2 class="o-label">How it works</h2>
+        <ol class="flex flex-col gap-5">
+            <li class="flex gap-4 items-baseline">
+                <span class="o-mono-ui" style="color: var(--ember)">01</span>
+                <p class="o-body-serif">Three frontier models critique your spec independently — no shared rubric, no groupthink.</p>
+            </li>
+            <li class="flex gap-4 items-baseline">
+                <span class="o-mono-ui" style="color: var(--ember)">02</span>
+                <p class="o-body-serif">A judge model organizes their critiques into findings — it never adds its own.</p>
+            </li>
+            <li class="flex gap-4 items-baseline">
+                <span class="o-mono-ui" style="color: var(--ember)">03</span>
+                <p class="o-body-serif">Every finding carries severity (blocker / should-fix / consider) and confidence (consensus / majority / split / lone-flag).</p>
+            </li>
         </ol>
     </section>
 
     <!-- Split Explainer -->
-    <section class="mb-16">
-        <h2 class="text-3xl font-bold mb-4">When the Panel Disagrees</h2>
-        <p class="text-lg">When the panel disagrees, you see both sides. A split on a blocker is the most valuable thing we can show you.</p>
+    <section class="flex flex-col gap-6">
+        <h2 class="o-label">When the panel disagrees</h2>
+        <p class="o-body-serif">When the panel disagrees, you see both sides. A split on a blocker is the most valuable thing we can show you.</p>
+        <div class="o-finding">
+            <div class="o-finding-header">
+                <div class="flex items-center gap-2.5">
+                    <span class="o-split-badge">split</span>
+                    <span class="o-mono-small" style="color: var(--text-4)">the panel disagrees — both positions, unaveraged</span>
+                </div>
+                <div class="o-title">UI-surface concepts (views, dialogs) exposed as side-effecting GETs</div>
+            </div>
+            <div class="grid md:grid-cols-[1fr_1px_1fr]">
+                <div class="flex flex-col gap-2.5 p-5">
+                    <span class="flex items-center gap-2">
+                        <span class="inline-block w-[7px] h-[7px] rounded-full" style="background: var(--voice-a)"></span>
+                        <span class="o-docket-model" style="color: var(--text-1)">claude-sonnet</span>
+                    </span>
+                    <span class="o-docket-text">&ldquo;A view has identity and a lifecycle — open, push, update, close. It's a resource being treated as a fire-and-forget GET.&rdquo;</span>
+                </div>
+                <div class="hidden md:block" style="background: var(--border-1)"></div>
+                <div class="flex flex-col gap-2.5 p-5" style="background: var(--voice-b-wash)">
+                    <span class="flex items-center gap-2">
+                        <span class="inline-block w-[7px] h-[7px] rounded-full" style="background: var(--voice-b)"></span>
+                        <span class="o-docket-model" style="color: var(--text-1)">glm-5.2</span>
+                    </span>
+                    <span class="o-docket-text">&ldquo;Modeling modal and workflow UI interactions as event-driven commands is not necessarily wrong for a platform API.&rdquo;</span>
+                </div>
+            </div>
+            <div class="px-5 py-3.5 border-t" style="border-color: var(--border-1)">
+                <span class="o-split-foot">→ this is a judgment call. The judge doesn't break the tie — you do.</span>
+            </div>
+        </div>
     </section>
 
     <!-- Featured Reviews -->
     @if ($featured)
-    <section class="mb-16">
-        <h2 class="text-3xl font-bold mb-8">Featured Reviews</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <section class="flex flex-col gap-6">
+        <h2 class="o-label">Published reviews</h2>
+        <div class="grid gap-4 md:grid-cols-3">
             @foreach ($featured as $publication)
-            <a href="{{ route('reviews.show', $publication->slug) }}" class="border border-gray-300 p-6 rounded hover:shadow-lg transition">
-                <h3 class="text-xl font-bold mb-2">{{ $publication->specName }}</h3>
-                <p class="text-gray-600 mb-2">{{ $publication->headline }}</p>
-                <p class="text-sm text-gray-500">{{ $publication->dimension }}</p>
+            @php($counts = $publication->findingCounts())
+            <a href="{{ route('reviews.show', $publication->slug) }}" class="o-card">
+                <span class="o-card-kicker">
+                    <span>{{ $publication->specName }} · {{ $publication->dimension }}</span>
+                </span>
+                <span class="o-card-headline">{{ $publication->headline }}</span>
+                <span class="o-card-foot">
+                    <span>
+                        @if ($counts['blocker']){{ $counts['blocker'] }} blocker{{ $counts['blocker'] > 1 ? 's' : '' }}@endif
+                        @if ($counts['blocker'] && $counts['should-fix']) · @endif
+                        @if ($counts['should-fix']){{ $counts['should-fix'] }} should-fix @endif
+                    </span>
+                    @if ($cost = $publication->totalCostUsd())
+                    <span class="o-card-cost">${{ number_format($cost, 2) }}</span>
+                    @endif
+                </span>
             </a>
             @endforeach
         </div>
@@ -46,31 +122,40 @@
     @endif
 
     <!-- Roadmap -->
-    <section class="mb-16">
-        <h2 class="text-3xl font-bold mb-8">What's Coming</h2>
-        <ul class="text-lg space-y-4">
-            <li><strong>CLI:</strong> <code class="font-mono">oast roast</code> in your terminal</li>
-            <li><strong>CI Gate:</strong> blockers fail the pipeline</li>
-            <li><strong>Hosted Platform:</strong> managed keys, teams</li>
+    <section id="roadmap" class="flex flex-col gap-6">
+        <h2 class="o-label">What's coming</h2>
+        <ul class="flex flex-col gap-4">
+            <li class="flex gap-4 items-baseline">
+                <span class="o-mono-ui" style="color: var(--text-1)">CLI</span>
+                <span class="o-body-serif"><code class="o-mono-ui">oast roast</code> in your terminal</span>
+            </li>
+            <li class="flex gap-4 items-baseline">
+                <span class="o-mono-ui" style="color: var(--text-1)">CI gate</span>
+                <span class="o-body-serif">blockers fail the pipeline</span>
+            </li>
+            <li class="flex gap-4 items-baseline">
+                <span class="o-mono-ui" style="color: var(--text-1)">hosted</span>
+                <span class="o-body-serif">managed keys, teams</span>
+            </li>
         </ul>
     </section>
 
     <!-- Signup -->
-    <section class="mb-16">
-        <h2 class="text-3xl font-bold mb-4">Get Notified at Launch</h2>
-        <p class="text-lg mb-4">We're building in the open. Leave an email, get the launch.</p>
-        <form method="POST" action="{{ route('subscribe') }}" class="max-w-md">
+    <section id="notify" class="flex flex-col gap-5 pb-8">
+        <h2 class="o-label">Get the launch</h2>
+        <form method="POST" action="{{ route('subscribe') }}" class="flex flex-col gap-2.5 max-w-[460px]">
             @csrf
-            <div class="mb-4">
-                <input type="email" name="email" required placeholder="you@company.com" class="w-full px-4 py-2 border border-gray-300 rounded">
+            <div class="flex gap-2.5">
+                <input type="email" name="email" required placeholder="you@company.dev" class="o-input flex-1 max-w-[280px]">
                 <input type="text" name="website" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true">
+                <button type="submit" class="o-btn">Notify me</button>
             </div>
-            <button type="submit" class="px-6 py-2 bg-gray-900 text-white rounded hover:bg-gray-800">Notify me</button>
+            <p class="o-mono-small" style="color: var(--text-4)">We're building in the open. Leave an email, get the launch.</p>
             @if (session('status'))
-            <p role="status" class="text-green-600 mt-2">{{ session('status') }}</p>
+            <p role="status" class="o-confirm-box"><span class="font-semibold">→</span> {{ session('status') }}</p>
             @endif
             @error('email')
-            <p role="alert" class="text-red-600 mt-2">{{ $message }}</p>
+            <p role="alert" class="o-mono-small" style="color: var(--ember)">{{ $message }}</p>
             @enderror
         </form>
     </section>

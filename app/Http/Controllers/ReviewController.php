@@ -23,6 +23,6 @@ final class ReviewController extends Controller
 
         return new ReviewResource($review)->response()
             ->setStatusCode(202)
-            ->header('Location', route('reviews.show', $review));
+            ->header('Location', route('api.reviews.show', $review));
     }
 }

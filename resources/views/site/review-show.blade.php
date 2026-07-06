@@ -3,94 +3,122 @@
 @section('title', $publication->specName . ' - oast')
 
 @section('content')
-<div class="max-w-6xl mx-auto px-4 py-12">
+<div class="mx-auto max-w-[880px] px-6 py-16 flex flex-col gap-10">
     <!-- Review Header -->
-    <h1 class="text-4xl font-bold mb-2">{{ $publication->headline }}</h1>
-    <p class="text-gray-600 mb-8">{{ $publication->specName }}</p>
+    <header class="flex flex-col gap-4">
+        <p class="o-label">{{ $publication->specName }} · {{ $publication->dimension }}</p>
+        <h1 class="o-headline">{{ $publication->headline }}</h1>
+    </header>
 
     <!-- Commentary -->
     @if (filled($publication->commentaryMd))
-    <section class="mb-8 prose prose-sm">
+    <section class="o-body-serif [&_em]:italic [&_a]:underline">
         {!! Str::markdown($publication->commentaryMd, ['html_input' => 'strip', 'allow_unsafe_links' => false]) !!}
     </section>
     @endif
 
     <!-- Meta Strip -->
-    <div class="bg-gray-100 p-6 rounded mb-12">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-                <p class="text-gray-600">Spec</p>
-                <p class="font-mono"><a href="{{ $publication->specSourceUrl }}" class="hover:underline">{{ $publication->specName }}</a></p>
-            </div>
-            <div>
-                <p class="text-gray-600">License</p>
-                <p>{{ $publication->specLicense }}</p>
-            </div>
-            <div>
-                <p class="text-gray-600">Dimension</p>
-                <p>{{ $publication->dimension }}</p>
-            </div>
-            @if ($cost = $publication->totalCostUsd())
-            <div>
-                <p class="text-gray-600">Cost</p>
-                <p class="font-mono">${{ number_format($cost, 2) }}</p>
-            </div>
-            @endif
-            <div>
-                <p class="text-gray-600">Reviewed</p>
-                <p>{{ $publication->reviewedAt->format('M d, Y') }}</p>
-            </div>
-            <div>
-                <p class="text-gray-600">Panelists</p>
-                <p class="font-mono text-xs">{{ implode(', ', $publication->panelists) }}</p>
-            </div>
-            <div>
-                <p class="text-gray-600">Judge</p>
-                <p class="font-mono text-xs">{{ $publication->judge }}</p>
-            </div>
+    <div class="o-meta">
+        <div class="o-meta-cell">
+            <span class="o-meta-label">Spec</span>
+            <span class="o-meta-value"><a href="{{ $publication->specSourceUrl }}" class="hover:underline">{{ $publication->specName }}</a></span>
+        </div>
+        <div class="o-meta-cell">
+            <span class="o-meta-label">License</span>
+            <span class="o-meta-value">{{ $publication->specLicense }}</span>
+        </div>
+        <div class="o-meta-cell">
+            <span class="o-meta-label">Dimension</span>
+            <span class="o-meta-value">{{ $publication->dimension }}</span>
+        </div>
+        @if ($cost = $publication->totalCostUsd())
+        <div class="o-meta-cell">
+            <span class="o-meta-label">Cost</span>
+            <span class="o-meta-value is-accent">${{ number_format($cost, 2) }}</span>
+        </div>
+        @endif
+        <div class="o-meta-cell">
+            <span class="o-meta-label">Reviewed</span>
+            <span class="o-meta-value">{{ $publication->reviewedAt->format('M d, Y') }}</span>
+        </div>
+        <div class="o-meta-cell">
+            <span class="o-meta-label">Panelists</span>
+            <span class="o-meta-value">{{ implode(' · ', $publication->panelists) }}</span>
+        </div>
+        <div class="o-meta-cell">
+            <span class="o-meta-label">Judge</span>
+            <span class="o-meta-value">{{ $publication->judge }}</span>
         </div>
     </div>
 
-    <!-- Findings -->
-    <section>
-        <h2 class="text-2xl font-bold mb-8">Findings</h2>
+    <!-- Findings index table -->
+    <section class="flex flex-col gap-5">
+        <h2 class="o-label">Findings</h2>
+        <div class="o-table">
+            <div class="o-table-head">
+                <div>severity</div>
+                <div>finding</div>
+                <div>location</div>
+                <div class="text-right">confidence</div>
+            </div>
+            @foreach ($publication->findings as $i => $finding)
+            <a href="#finding-{{ $i + 1 }}" class="o-table-row" data-severity="{{ $finding['severity'] ?? '' }}">
+                <span class="o-sev o-sev-{{ $finding['severity'] ?? 'consider' }}">{{ $finding['severity'] ?? '' }}</span>
+                <span class="o-finding-title">{{ $finding['title'] ?? '' }}</span>
+                <span class="o-loc" title="{{ $finding['location'] ?? '' }}">{{ $finding['location'] ?? '' }}</span>
+                <span class="flex justify-end">
+                    @php($conf = $finding['confidence'] ?? 'lone-flag')
+                    <span class="o-conf o-conf-{{ $conf }} o-sev-{{ $finding['severity'] ?? 'consider' }}"><span class="o-conf-text">{{ $conf }}</span></span>
+                </span>
+            </a>
+            @endforeach
+        </div>
+    </section>
 
-        <div class="space-y-8">
-            @foreach ($publication->findings as $finding)
-            <article class="border-l-4 border-gray-300 pl-6">
-                <header class="mb-4">
-                    <div class="flex gap-3 mb-2">
-                        <span class="font-mono text-sm px-2 py-1 bg-gray-200 rounded">{{ $finding['severity'] ?? '' }}</span>
-                        <span class="font-mono text-sm px-2 py-1 bg-gray-200 rounded">{{ $finding['confidence'] ?? '' }}</span>
-                    </div>
-                    <h3 class="text-xl font-bold mb-2">{{ $finding['title'] ?? '' }}</h3>
-                    <code class="font-mono text-sm text-gray-600">{{ $finding['location'] ?? '' }}</code>
-                </header>
+    <!-- Finding detail -->
+    <section class="flex flex-col gap-6">
+        @foreach ($publication->findings as $i => $finding)
+        <article id="finding-{{ $i + 1 }}" class="o-finding">
+            <header class="o-finding-header">
+                <div class="flex items-center gap-3">
+                    <span class="o-sev o-sev-{{ $finding['severity'] ?? 'consider' }}">{{ $finding['severity'] ?? '' }}</span>
+                    @php($conf = $finding['confidence'] ?? 'lone-flag')
+                    @if ($conf === 'split')
+                    <span class="o-split-badge">split</span>
+                    @else
+                    <span class="o-conf o-conf-{{ $conf }} o-sev-{{ $finding['severity'] ?? 'consider' }}"><span class="o-conf-text">{{ $conf }}</span></span>
+                    @endif
+                </div>
+                <h3 class="o-title">{{ $finding['title'] ?? '' }}</h3>
+                <code class="o-loc !whitespace-normal">{{ $finding['location'] ?? '' }}</code>
+            </header>
 
-                <p class="mb-4">{{ $finding['finding'] ?? '' }}</p>
+            <div class="o-finding-body">
+                <p>{{ $finding['finding'] ?? '' }}</p>
 
                 @if ($finding['why_it_matters'] ?? null)
-                <p class="italic text-gray-600 mb-4">{{ $finding['why_it_matters'] }}</p>
+                <p class="o-finding-why">{{ $finding['why_it_matters'] }}</p>
                 @endif
 
                 @if (filled($finding['disagreement'] ?? null))
                 @if (($finding['confidence'] ?? null) === 'split')
-                <blockquote data-split class="bg-gray-50 border-l-4 border-gray-400 pl-4 py-2 mb-4 italic">
+                <blockquote data-split class="o-disagreement">
                     {{ $finding['disagreement'] }}
                 </blockquote>
+                <p class="o-split-foot">→ this is a judgment call. The judge doesn't break the tie — you do.</p>
                 @else
-                <blockquote data-disagreement class="bg-gray-50 border-l-4 border-gray-400 pl-4 py-2 mb-4 italic">
+                <blockquote data-disagreement class="o-disagreement">
                     {{ $finding['disagreement'] }}
                 </blockquote>
                 @endif
                 @endif
 
                 @if ($finding['suggested_change'] ?? null)
-                <p class="text-gray-700">{{ $finding['suggested_change'] }}</p>
+                <p class="o-suggest">→ {{ $finding['suggested_change'] }}</p>
                 @endif
-            </article>
-            @endforeach
-        </div>
+            </div>
+        </article>
+        @endforeach
     </section>
 </div>
 @endsection
