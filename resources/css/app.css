@@ -109,8 +109,12 @@
     --animate-fade-in: fade-in 0.3s ease-out;
 
     @keyframes fade-in {
-        from { opacity: 0; }
-        to { opacity: 1; }
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
     }
 
     /* the one dramatic shadow */
@@ -130,11 +134,14 @@
 
 /* Non-utility tokens (gradients, tracking, metrics). */
 :root {
-    --glow-hero: radial-gradient(ellipse 70% 100% at 50% 100%, rgba(242, 100, 48, 0.13) 0%, transparent 65%);
+    --glow-hero: radial-gradient(
+        ellipse 70% 100% at 50% 100%,
+        rgba(242, 100, 48, 0.13) 0%,
+        transparent 65%
+    );
     --glow-horizon-line: linear-gradient(90deg, transparent, rgba(242, 100, 48, 0.55), transparent);
     --gradient-card: linear-gradient(180deg, #1e1915 0%, #171310 100%);
     --gradient-split-badge: linear-gradient(90deg, var(--color-ember) 50%, var(--color-amber) 50%);
-
 }
 
 @layer base {

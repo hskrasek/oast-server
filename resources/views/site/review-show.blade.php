@@ -43,11 +43,11 @@
         </div>
         <div class="o-meta-cell">
             <span class="o-meta-label">Panelists</span>
-            <span class="o-meta-value">{{ implode(' · ', $publication->panelists) }}</span>
+            <span class="o-meta-value"><x-site.panelists :models="$publication->panelists" /></span>
         </div>
         <div class="o-meta-cell">
             <span class="o-meta-label">Judge</span>
-            <span class="o-meta-value">{{ $publication->judge }}</span>
+            <span class="o-meta-value" title="{{ $publication->judge }}">{{ \App\Site\ModelDisplay::short($publication->judge) }}</span>
         </div>
     </div>
 
