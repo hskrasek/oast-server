@@ -157,11 +157,16 @@ never regenerated per-review — the manual per-review step stays gone.
 ## Infrastructure — OpenTofu
 
 - **Runtime Cloudflare token**, scoped to Browser Rendering only — distinct from
-  the `oast-tofu` provisioning token (DNS + Tunnel write). Minted once, stored in
-  Secrets Manager, injected into the ECS task env. Tofu adds: the Secrets Manager
-  secret, the task-definition env wiring, and the execution-role read grant
-  (alongside `app-key` / tunnel-token). Token value supplied once as a runbook
-  step, mirroring the app-key seeding.
+  the `oast-tofu` provisioning token (DNS + Tunnel write). **Tofu mints it** via a
+  `cloudflare_api_token` resource (Browser Rendering permission on the account),
+  writes the value straight into Secrets Manager, and wires it into the ECS task
+  env + execution-role read grant (alongside `app-key` / tunnel-token). No manual
+  token step — the whole chain is `tofu apply`.
+  - **Prerequisite:** minting a token via tofu requires the *provisioning* token
+    (`oast-tofu`) to carry the user-level **"API Tokens Write"** permission, which
+    it currently lacks. One-time broadening of `oast-tofu` (re-mint with DNS Write
+    + Tunnel Write + API Tokens Write). The minted runtime token's value lands in
+    tofu state (S3, encrypted) — same handling as the tunnel secret.
 - `config/services.php` — a `cloudflare` block: `account_id` (known),
   `browser_token` (from env).
 
@@ -198,5 +203,6 @@ SES production access.
 3. **Statelessness:** image route outside session middleware; origin stateless.
 4. **Seam:** `OgImageRenderer` interface, real + fake, bound per environment.
 5. **Fallback:** single committed `fallback.png`, short TTL on failure.
-6. **Token:** runtime Browser-Rendering-scoped CF token in Secrets Manager,
-   separate from the tofu token.
+6. **Token:** runtime Browser-Rendering-scoped CF token, **minted by tofu**
+   (`cloudflare_api_token`) into Secrets Manager — separate from the tofu
+   provisioning token, which must gain "API Tokens Write" to mint it.
