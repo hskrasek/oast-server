@@ -81,8 +81,16 @@ the repo (Publication/finding JSON as before):
    the DocketPanel (pending/running/done per panelist, the type-in animation policy,
    progress affordance `█░`) — this is the signature M3 surface and it should feel
    like watching the kiln work.
-5. **Social/OG image direction:** one 1200×630 template for review pages (headline,
-   spec name, severity counts, cost) in the terminal-kiln language.
+5. **Social/OG image direction:** ~~one 1200×630 template for review pages~~ — **done and
+   shipped 2026-07-07.** Your `surfaces/og-image.html` was implemented 1:1 as a Blade
+   template (inline severity styles became `text-sev-*` utilities); production captures
+   it to static PNGs per review plus a home variant. Treat that surface as canonical.
+6. **Favicon:** production shipped a working default (see `docs/design/brand-favicon.html`
+   in the repo, or ask for it): the three panelist identity dots — ember/amber/copper —
+   on the kiln surface tile, as `favicon.svg` + `.ico` + 180px apple-touch. It reuses
+   the docket traffic-light motif rather than drawing a logo, so the no-logo rule is
+   treated as intact. Bless it or counter-propose (alternates considered: ember "o"
+   tile, horizon-line tile); production will follow this ruling.
 
 ## 4. Rules that keep the loop tight
 
