@@ -28,3 +28,8 @@ Thumbs.db
 
 # session artifacts (repo root only)
 /*.png
+
+# opentofu local state & vars (infra secrets/IDs stay out of the repo)
+infra/**/.terraform/
+infra/*.tfvars
+infra/bootstrap/*.tfstate*
