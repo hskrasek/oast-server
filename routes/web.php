@@ -10,6 +10,7 @@ use App\Http\Controllers\Site\SubscribeController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+Route::view('/why', 'site.why')->name('why');
 Route::get('/reviews', ReviewIndexController::class)->name('reviews.index');
 Route::get('/reviews/{slug}', ReviewShowController::class)->name('reviews.show');
 

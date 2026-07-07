@@ -57,6 +57,9 @@ When you emit code with utility classes, use the Tailwind names production gener
   the homepage explainer). Keep both variants in `SplitBlock`, but design the prose
   fallback as a first-class citizen, not a degraded state.
 - **The wordmark** is implemented as `oast` in ink + `.sh` in ember, Plex Mono 600 — as specified. Still no logo; still don't draw one.
+- **A `/why` essay page shipped** (nav: reviews / why / roadmap / notify me): a long-form
+  first-person page using `o-label` + `o-headline` + serif body paragraphs at a ~65ch
+  measure. It's prose-only by design; if you propose art direction for it, stay typographic.
 
 ## 3. Commission: surfaces the product needs next
 
@@ -70,7 +73,8 @@ the repo (Publication/finding JSON as before):
    in-flight submit state, and the confirmed page (currently minimal — give it the
    amber confirm treatment plus a "what happens next" line).
 3. **Mobile navigation:** the nav currently just wraps; decide whether links collapse,
-   condense, or stay (three links may simply fit — if so, bless that explicitly).
+   condense, or stay. Production now has **four** nav items (reviews / why / roadmap /
+   notify me) — rule on whether they still fit inline on mobile or need condensing.
 4. **M3 preview — the live review stream:** the next product milestone renders a
    running Council review from Server-Sent Events: panelists starting/finishing with
    timings and costs, judge phase, findings arriving. Design the streaming states of

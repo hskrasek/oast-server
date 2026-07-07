@@ -17,6 +17,12 @@ it('renders the homepage with concept copy, featured reviews, and the signup for
         ->assertDontSee('Payment flow retry safety');  // 4th fixture is older, not in top 3
 });
 
+it('renders the why page', function (): void {
+    $this->get('/why')->assertOk()
+        ->assertSee('I didn')  // headline: "I didn't want to build an AI product."
+        ->assertSee('kiln');
+});
+
 it('renders the reviews index', function (): void {
     $this->get('/reviews')->assertOk()->assertSee('Train Travel API');
 });

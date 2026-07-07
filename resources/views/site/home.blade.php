@@ -61,7 +61,7 @@
     <!-- Split Explainer -->
     <section class="flex flex-col gap-6">
         <h2 class="o-label">When the panel disagrees</h2>
-        <p>When the panel disagrees, you see both sides. A split on a blocker is the most valuable thing we can show you.</p>
+        <p>When the panel disagrees, you see both sides. A split on a blocker is the most valuable thing a review can surface — it means the question is real.</p>
         <div class="o-finding">
             <div class="o-finding-header">
                 <div class="flex items-center gap-2.5">
@@ -134,7 +134,8 @@
                 <input type="text" name="website" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true">
                 <button type="submit" class="o-btn">Notify me</button>
             </div>
-            <p class="font-mono text-mono-small text-subtle">We're building in the open. Leave an email, get the launch.</p>
+            <p class="font-mono text-mono-small text-subtle">I'm building this in the open. Leave an email, get the launch.</p>
+            <p class="font-mono text-mono-small text-subtle">Skeptical of AI tools? So am I — <a href="{{ route('why') }}" class="text-muted underline">why oast exists →</a></p>
             @if (session('status'))
             <p role="status" class="o-confirm-box"><span class="font-semibold">→</span> {{ session('status') }}</p>
             @endif

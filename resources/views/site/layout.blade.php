@@ -12,6 +12,7 @@
             <a href="{{ route('home') }}" class="o-wordmark">oast<em>.sh</em></a>
             <div class="flex items-center gap-7">
                 <a href="{{ route('reviews.index') }}" class="o-nav-link" @if (request()->routeIs('reviews.*')) aria-current="page" @endif>reviews</a>
+                <a href="{{ route('why') }}" class="o-nav-link" @if (request()->routeIs('why')) aria-current="page" @endif>why</a>
                 <a href="{{ route('home') }}#roadmap" class="o-nav-link">roadmap</a>
                 <a href="{{ route('home') }}#notify" class="o-btn o-btn-outline h-auto py-2 px-3.5 text-mono-ui font-normal">notify me</a>
             </div>
