@@ -13,9 +13,14 @@ final readonly class OgTemplate
 
     public function __construct(private OgAssets $assets) {}
 
+    public static function homeHash(): string
+    {
+        return mb_substr(sha1('home-' . self::HOME_VERSION), 0, 8);
+    }
+
     public static function homeImageUrl(): string
     {
-        return '/og/home-' . mb_substr(sha1('home-' . self::HOME_VERSION), 0, 8) . '.png';
+        return '/og/home-' . self::homeHash() . '.png';
     }
 
     public function review(Publication $publication): View

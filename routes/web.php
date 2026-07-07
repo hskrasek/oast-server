@@ -20,6 +20,7 @@ Route::get('/reviews/{slug}', ReviewShowController::class)->name('reviews.show')
 // Rendering. Outside session middleware so no Set-Cookie defeats edge caching.
 Route::get('/og/{file}.png', OgImageController::class)
     ->where('file', '[A-Za-z0-9-]+')
+    ->middleware('throttle:60,1')
     ->withoutMiddleware([
         // Strip session/cookie middleware so no Set-Cookie is emitted (which would
         // make Cloudflare refuse to cache the PNG). ShareErrorsFromSession and

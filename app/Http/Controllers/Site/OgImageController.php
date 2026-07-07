@@ -23,11 +23,25 @@ final class OgImageController
         }
 
         $slug = $matches['slug'];
+        $hash = $matches['hash'];
 
-        // Resolve BEFORE the try so an unknown slug 404s instead of falling back.
-        $view = $slug === 'home'
-            ? $template->home()
-            : $template->review($publications->find($slug) ?? abort(404));
+        // Resolve + validate BEFORE the try so an unknown slug or stale/forged
+        // hash 404s instead of falling back to a paid render.
+        if ($slug === 'home') {
+            if (! hash_equals(OgTemplate::homeHash(), $hash)) {
+                abort(404);
+            }
+
+            $view = $template->home();
+        } else {
+            $publication = $publications->find($slug) ?? abort(404);
+
+            if (! hash_equals($publication->ogHash(), $hash)) {
+                abort(404);
+            }
+
+            $view = $template->review($publication);
+        }
 
         try {
             $png = $renderer->screenshot($view->render());

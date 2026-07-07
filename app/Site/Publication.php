@@ -119,6 +119,7 @@ final readonly class Publication
 
         $key = implode('|', [
             $this->headline,
+            $this->specName,
             (string) $counts['blocker'],
             (string) $counts['should-fix'],
             (string) $counts['consider'],
