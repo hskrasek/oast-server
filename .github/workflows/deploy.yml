@@ -22,6 +22,7 @@ jobs:
       - run: composer test
   deploy:
     needs: test
+    if: ${{ vars.AWS_DEPLOY_ROLE_ARN != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
