@@ -1,2 +1,3 @@
+# Pre-launch: block all crawling until launch, then restore "Disallow:"
 User-agent: *
-Disallow:
+Disallow: /
