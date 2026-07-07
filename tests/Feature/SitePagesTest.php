@@ -62,3 +62,15 @@ it('honors X-Forwarded-Proto from the trusted tunnel proxy when generating asset
     expect($html)->toContain('src="https://')
         ->and($html)->not->toContain('src="http://');
 });
+
+it('emits a dynamic hashed og:image on the homepage', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    expect($html)->toMatch('#property="og:image" content="[^"]*/og/home-[a-f0-9]{8}\.png"#');
+});
+
+it('emits a dynamic hashed og:image on a review page', function (): void {
+    $html = $this->get('/reviews/train-travel-domain-modeling')->assertOk()->getContent();
+
+    expect($html)->toMatch('#property="og:image" content="[^"]*/og/train-travel-domain-modeling-[a-f0-9]{8}\.png"#');
+});
