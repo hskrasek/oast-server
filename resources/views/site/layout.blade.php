@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {{-- Pre-launch: delete at launch along with the robots.txt Disallow --}}
+    <meta name="robots" content="noindex, nofollow">
     <title>@yield('title', 'oast — raw spec in, refined spec out')</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
