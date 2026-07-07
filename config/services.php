@@ -42,4 +42,9 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'cloudflare' => [
+        'account_id' => env('CLOUDFLARE_ACCOUNT_ID', ''),
+        'browser_token' => env('CLOUDFLARE_BROWSER_TOKEN', ''),
+    ],
+
 ];

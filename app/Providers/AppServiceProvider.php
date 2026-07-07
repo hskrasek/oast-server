@@ -8,6 +8,8 @@ use App\Council\CouncilOrchestrator;
 use App\Council\FindingValidator;
 use App\Site\Newsletter\NewsletterContacts;
 use App\Site\Newsletter\SesNewsletterContacts;
+use App\Site\Og\CloudflareOgImageRenderer;
+use App\Site\Og\OgImageRenderer;
 use Aws\SesV2\SesV2Client;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Container\Container;
@@ -35,6 +37,14 @@ final class AppServiceProvider extends ServiceProvider
             fn(): NewsletterContacts => new SesNewsletterContacts(
                 new SesV2Client(['version' => 'latest', 'region' => config()->string('services.ses_contacts.region')]),
                 config()->string('services.ses_contacts.list'),
+            ),
+        );
+
+        $this->app->singleton(
+            OgImageRenderer::class,
+            fn(): OgImageRenderer => new CloudflareOgImageRenderer(
+                config()->string('services.cloudflare.account_id'),
+                config()->string('services.cloudflare.browser_token'),
             ),
         );
     }
