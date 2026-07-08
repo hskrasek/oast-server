@@ -112,4 +112,26 @@ final readonly class Publication
 
         return null;
     }
+
+    public function ogHash(): string
+    {
+        $counts = $this->findingCounts();
+
+        $key = implode('|', [
+            $this->headline,
+            $this->specName,
+            (string) $counts['blocker'],
+            (string) $counts['should-fix'],
+            (string) $counts['consider'],
+            (string) ($this->totalCostUsd() ?? ''),
+            $this->dimension,
+        ]);
+
+        return mb_substr(sha1($key), 0, 8);
+    }
+
+    public function ogImageUrl(): string
+    {
+        return sprintf('/og/%s-%s.png', $this->slug, $this->ogHash());
+    }
 }

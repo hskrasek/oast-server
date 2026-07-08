@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Site\Publication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -76,4 +77,26 @@ function fakeCouncil(): void
 {
     App\Ai\Agents\Panelist::fake(['critique a', 'critique b', 'critique c']);
     App\Ai\Agents\Judge::fake([['findings' => [validFinding()]]]);
+}
+
+function ogPublicationFixture(array $overrides = []): Publication
+{
+    return Publication::fromArray(array_merge([
+        'slug' => 'train-travel-domain-modeling',
+        'headline' => 'The Council vs. a well-designed spec',
+        'commentary_md' => '',
+        'spec_name' => 'Train Travel API',
+        'spec_source_url' => 'https://example.test/spec',
+        'spec_license' => 'CC-BY',
+        'dimension' => 'domain-modeling',
+        'panelists' => ['openai/gpt-5.5'],
+        'judge' => 'anthropic/claude-opus-4.8',
+        'findings' => [
+            ['severity' => 'blocker'],
+            ['severity' => 'should-fix'],
+        ],
+        'metrics' => [['total_cost_usd' => 0.62]],
+        'reviewed_at' => '2026-07-05T00:00:00Z',
+        'published_at' => '2026-07-05T00:00:00Z',
+    ], $overrides));
 }

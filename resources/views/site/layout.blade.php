@@ -15,7 +15,7 @@
     <meta property="og:title" content="@yield('og_title', 'oast — raw spec in, refined spec out')">
     <meta property="og:description" content="@yield('meta_description', 'Your API design, argued over by a panel that never gets tired.')">
     <meta property="og:url" content="{{ url()->current() }}">
-    <meta property="og:image" content="@yield('og_image', asset('og/home.png'))">
+    <meta property="og:image" content="@yield('og_image', url(\App\Site\Og\OgTemplate::homeImageUrl()))">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta name="twitter:card" content="summary_large_image">

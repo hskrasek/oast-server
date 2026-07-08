@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Site\ConfirmSubscriptionController;
 use App\Http\Controllers\Site\HomeController;
+use App\Http\Controllers\Site\OgImageController;
 use App\Http\Controllers\Site\ReviewIndexController;
 use App\Http\Controllers\Site\ReviewShowController;
 use App\Http\Controllers\Site\SubscribeController;
+use App\Site\Og\OgTemplate;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -14,23 +16,30 @@ Route::view('/why', 'site.why')->name('why');
 Route::get('/reviews', ReviewIndexController::class)->name('reviews.index');
 Route::get('/reviews/{slug}', ReviewShowController::class)->name('reviews.show');
 
-// OG raster templates — local render targets for screenshot capture, never in prod.
-if (app()->environment('local')) {
-    Route::view('/og/home', 'site.og-home')->name('og.home');
-    Route::get('/og/{slug}', function (string $slug, App\Site\PublicationRepository $publications) {
-        $publication = $publications->find($slug) ?? abort(404);
-        $counts = $publication->findingCounts();
+// Public OG image endpoint — crawlers hit this; it calls Cloudflare Browser
+// Rendering. Outside session middleware so no Set-Cookie defeats edge caching.
+Route::get('/og/{file}.png', OgImageController::class)
+    ->where('file', '[A-Za-z0-9-]+')
+    ->middleware('throttle:60,1')
+    ->withoutMiddleware([
+        // Strip session/cookie middleware so no Set-Cookie is emitted (which would
+        // make Cloudflare refuse to cache the PNG). ShareErrorsFromSession and
+        // PreventRequestForgery must go too — both call $request->session() (the
+        // latter to stamp an XSRF-TOKEN cookie even on GET) and throw once
+        // StartSession is gone.
+        Illuminate\Session\Middleware\StartSession::class,
+        Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
+    ])
+    ->name('og.image');
 
-        return view('site.og', [
-            'publication' => $publication,
-            'cost' => $publication->totalCostUsd(),
-            'tally' => array_filter([
-                'text-sev-blocker' => $counts['blocker'] !== 0 ? $counts['blocker'] . ' blocker' . ($counts['blocker'] > 1 ? 's' : '') : null,
-                'text-sev-should-fix' => $counts['should-fix'] !== 0 ? $counts['should-fix'] . ' should-fix' : null,
-                'text-sev-consider' => $counts['consider'] !== 0 ? $counts['consider'] . ' consider' : null,
-            ]),
-        ]);
-    })->name('og.review');
+// Local-only HTML previews for iterating on the card design in a browser.
+if (app()->environment('local')) {
+    Route::get('/og/preview', fn(OgTemplate $template) => $template->home())->name('og.preview.home');
+    Route::get('/og/preview/{slug}', function (string $slug, OgTemplate $template, App\Site\PublicationRepository $publications) {
+        return $template->review($publications->find($slug) ?? abort(404));
+    })->name('og.preview.review');
 }
 
 Route::post('/subscribe', SubscribeController::class)
