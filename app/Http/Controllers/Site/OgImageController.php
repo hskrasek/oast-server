@@ -53,9 +53,14 @@ final class OgImageController
         } catch (Throwable $throwable) {
             report($throwable);
 
+            // The fallback must NOT be cached: Cloudflare's edge-TTL floor (Free
+            // plan) rounds any positive max-age up to hours, so a transient render
+            // failure (e.g. a Browser Rendering 429) would pin the wrong image for
+            // that whole window. no-store means the next request retries the render
+            // and self-heals into the immutable success cache.
             return response((string) file_get_contents(public_path('og/fallback.png')), 200, [
                 'Content-Type' => 'image/png',
-                'Cache-Control' => 'public, max-age=300',
+                'Cache-Control' => 'private, no-store, max-age=0',
             ]);
         }
     }

@@ -58,13 +58,15 @@ it('404s the home slug with a well-formed but wrong hash', function (): void {
     $this->get('/og/home-00000000.png')->assertNotFound();
 });
 
-it('serves the fallback image with a short ttl when rendering throws', function (): void {
+it('serves the fallback image as non-cacheable when rendering throws', function (): void {
     app()->instance(OgImageRenderer::class, new ThrowingOgImageRenderer());
 
     $url = (app(PublicationRepository::class)->find('train-travel-domain-modeling') ?? throw new RuntimeException('fixture missing'))->ogImageUrl();
 
     $response = $this->get($url)->assertOk();
 
+    // Fallback must not be cached (see controller note): a cached failure would
+    // pin the wrong image for hours under Cloudflare's edge-TTL floor.
     expect($response->headers->get('Content-Type'))->toBe('image/png')
-        ->and($response->headers->get('Cache-Control'))->toContain('max-age=300');
+        ->and($response->headers->get('Cache-Control'))->toContain('no-store');
 });
