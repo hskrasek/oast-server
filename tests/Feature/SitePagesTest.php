@@ -40,6 +40,12 @@ it('404s unknown review slugs with the branded error page', function (): void {
         ->assertSee('survive the roast');
 });
 
+it('renders the branded 419 page', function (): void {
+    $this->view('errors.419')
+        ->assertSee('That form went stale.')
+        ->assertSee('back to the form');
+});
+
 it('renders commentary as markdown and strips unsafe HTML', function (): void {
     $this->get('/reviews/slack-domain-modeling')->assertOk()
         ->assertSee('<em>famously</em>', escape: false)  // markdown emphasis rendered
