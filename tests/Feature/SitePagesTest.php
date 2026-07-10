@@ -35,8 +35,9 @@ it('renders a review page with findings, meta, and cost', function (): void {
         ->assertSee('anthropic/claude-opus-4.8');
 });
 
-it('404s unknown review slugs', function (): void {
-    $this->get('/reviews/nope')->assertNotFound();
+it('404s unknown review slugs with the branded error page', function (): void {
+    $this->get('/reviews/nope')->assertNotFound()
+        ->assertSee('survive the roast');
 });
 
 it('renders commentary as markdown and strips unsafe HTML', function (): void {

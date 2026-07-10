@@ -46,7 +46,7 @@
 
     <footer class="o-footer">
         <span>oast — raw spec in, refined spec out.</span>
-        <a href="https://github.com">github ↗</a>
+        <a href="https://github.com/hskrasek/oast-server">github ↗</a>
     </footer>
 </body>
 </html>

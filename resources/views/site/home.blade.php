@@ -4,7 +4,7 @@
     <div class="mx-auto max-w-hero px-6 lg:px-12 py-20 lg:py-24 grid gap-14 lg:grid-cols-[1fr_540px] items-center">
         <div class="flex flex-col gap-7">
             <h1 class="o-display">Your API design, argued over by a panel that never gets tired.</h1>
-            <p class="max-w-[46ch]">Spectral tells you an operationId is missing. Nobody tells you your resource model leaks the database, your payment flow can't be retried safely, or your 'REST' API is RPC in a trench coat — until clients depend on it.</p>
+            <p class="max-w-[46ch]">Your linter tells you an operationId is missing. Nobody tells you your resource model leaks the database, your payment flow can't be retried safely, or your 'REST' API is RPC in a trench coat — until clients depend on it.</p>
             <div class="flex items-center gap-4">
                 <a href="#notify" class="o-btn">Notify me</a>
                 <a href="{{ route('reviews.index') }}" class="o-btn o-btn-outline">read the reviews →</a>

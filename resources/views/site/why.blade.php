@@ -1,4 +1,8 @@
-<x-layouts.app title="Why - oast">
+<x-layouts.app
+    title="Why - oast"
+    og-title="I didn't want to build an AI product."
+    meta-description="Why oast exists: an LLM skeptic's case for multi-model API design review — panels that disagree, judges that don't average, and receipts for every claim."
+>
 <x-site.page class="py-16 flex flex-col gap-10">
     <header class="flex flex-col gap-4 max-w-[65ch]">
         <p class="o-label">Why oast exists</p>
@@ -11,8 +15,9 @@
         an API I've worked on for years, understand that nobody is less comfortable with that sentence
         than I am.</p>
 
-        <p>Here's the itch this scratches. Linters are great at what they do — Spectral will tell you an
-        operationId is missing every single time. But the expensive API mistakes aren't lint. A resource
+        <p>Here's the itch this scratches. Linters are great at what they do — Spectral, Redocly,
+        vacuum, take your pick: any of them will tell you an operationId is missing every single
+        time. But the expensive API mistakes aren't lint. A resource
         model that leaks your database schema. A payment flow that can't be retried safely. Two pagination
         styles that reveal your API evolved instead of being designed. Those get caught in design review,
         by senior engineers with taste and long memories — if you can get three of them in a room, which
@@ -37,7 +42,9 @@
         Raw spec in, refined spec out. (It also happens to contain "OAS", which was too good to pass up.)</p>
 
         <p>The plan is open-core. The server will be AGPL and self-hostable — bring your own OpenRouter
-        key, pay the per-review cost you see on every published page, and nothing else. A hosted version
+        key, pay what the models charge per review, and nothing else; the cent-level costs on the
+        published reviews are the entire bill. And publishing is my demo, not the product: your reviews
+        are private, organized on your own instance for your own team. A hosted version
         comes later, for people who'd rather not run infrastructure to get a design review. The CLI
         (<code class="font-mono text-mono-ui text-muted">oast roast ./openapi.yaml</code>) will be MIT,
         because a CI tool you can't freely embed is a CI tool you uninstall.</p>
@@ -45,8 +52,8 @@
         <p>If you spot something wrong — in a review, in the approach, in this page — tell me. Being
         corrected in public is roughly half of how I've learned everything I know. And if you just want to
         know whether the Council is any good, don't take my word for it:
-        <a href="{{ route('reviews.index') }}" class="underline">read the reviews</a>. They're the honest
-        pitch.</p>
+        <a href="{{ route('reviews.index') }}" class="underline">read the Council's published reviews</a>.
+        They're the honest pitch.</p>
     </div>
 </x-site.page>
 </x-layouts.app>
