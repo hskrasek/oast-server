@@ -6,8 +6,7 @@ on:
     types: [opened, closed, synchronize]
 
 permissions:
-  actions: write
-  contents: write
+  contents: write # signature records on the cla-signatures branch
   pull-requests: write
   statuses: write
 
@@ -15,7 +14,7 @@ jobs:
   cla:
     runs-on: ubuntu-latest
     steps:
-      - uses: contributor-assistant/github-action@v2.6.1
+      - uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
