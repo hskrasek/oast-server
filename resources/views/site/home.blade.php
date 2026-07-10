@@ -1,6 +1,4 @@
-@extends('site.layout')
-
-@section('content')
+<x-layouts.app>
 <!-- Hero -->
 <section class="o-hero">
     <div class="mx-auto max-w-hero px-6 lg:px-12 py-20 lg:py-24 grid gap-14 lg:grid-cols-[1fr_540px] items-center">
@@ -145,4 +143,4 @@
         </form>
     </section>
 </x-site.page>
-@endsection
+</x-layouts.app>

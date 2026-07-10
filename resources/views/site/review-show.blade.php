@@ -1,11 +1,9 @@
-@extends('site.layout')
-
-@section('title', $publication->specName . ' - oast')
-@section('og_title', $publication->headline)
-@section('meta_description', $publication->specName . ' · ' . $publication->dimension . ' — reviewed by the Council: ' . count($publication->findings) . ' findings with severity, confidence, and disagreements.')
-@section('og_image', url($publication->ogImageUrl()))
-
-@section('content')
+<x-layouts.app
+    :title="$publication->specName . ' - oast'"
+    :og-title="$publication->headline"
+    :meta-description="$publication->specName . ' · ' . $publication->dimension . ' — reviewed by the Council: ' . count($publication->findings) . ' findings with severity, confidence, and disagreements.'"
+    :og-image="url($publication->ogImageUrl())"
+>
 <x-site.page class="py-16 flex flex-col gap-10">
     <!-- Review Header -->
     <header class="flex flex-col gap-4">
@@ -118,4 +116,4 @@
         @endforeach
     </section>
 </x-site.page>
-@endsection
+</x-layouts.app>

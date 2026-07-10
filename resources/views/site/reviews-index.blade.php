@@ -1,8 +1,4 @@
-@extends('site.layout')
-
-@section('title', 'Reviews - oast')
-
-@section('content')
+<x-layouts.app title="Reviews - oast">
 <x-site.page class="py-16 flex flex-col gap-8">
     <header class="flex flex-col gap-3">
         <h1 class="o-headline">Published Reviews</h1>
@@ -15,4 +11,4 @@
         @endforeach
     </div>
 </x-site.page>
-@endsection
+</x-layouts.app>

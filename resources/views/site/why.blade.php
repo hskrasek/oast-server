@@ -1,8 +1,4 @@
-@extends('site.layout')
-
-@section('title', 'Why - oast')
-
-@section('content')
+<x-layouts.app title="Why - oast">
 <x-site.page class="py-16 flex flex-col gap-10">
     <header class="flex flex-col gap-4 max-w-[65ch]">
         <p class="o-label">Why oast exists</p>
@@ -53,4 +49,4 @@
         pitch.</p>
     </div>
 </x-site.page>
-@endsection
+</x-layouts.app>
