@@ -15,7 +15,7 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon-32.png') }}">
     <link rel="apple-touch-icon" href="{{ asset('apple-touch-icon.png') }}">
-    <meta name="description" content="{{ $metaDescription ?? 'Multi-model API design review. Three frontier models critique your OpenAPI spec independently; a judge organizes their findings — severity, confidence, and disagreements included.' }}">
+    <meta name="description" content="{{ $metaDescription ?? 'Multi-model API design review: three frontier models critique your OpenAPI spec independently; a judge organizes findings by severity and confidence.' }}">
     <meta property="og:site_name" content="oast.sh">
     <meta property="og:type" content="website">
     <meta property="og:title" content="{{ $ogTitle }}">
