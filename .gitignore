@@ -28,3 +28,6 @@ Thumbs.db
 
 # session artifacts (repo root only)
 /*.png
+
+# local git worktrees
+/.worktrees/
