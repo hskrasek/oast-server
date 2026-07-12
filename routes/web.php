@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\MembershipController;
+use App\Http\Controllers\OrganizationInvitationController;
+use App\Http\Controllers\OrganizationSettingsController;
+use App\Http\Controllers\OwnershipTransferController;
 use App\Http\Controllers\SetupAuthorizationController;
 use App\Http\Controllers\SetupController;
 use App\Http\Controllers\Site\ConfirmSubscriptionController;
@@ -61,4 +65,12 @@ Route::post('/setup/authorize', SetupAuthorizationController::class)->middleware
 Route::post('/setup', [SetupController::class, 'store'])->middleware('throttle:5,1')->name('setup.store');
 Route::prefix('app')->name('app.')->middleware(['installation', 'auth', 'verified.configured', 'organization'])->group(function (): void {
     Route::view('/', 'app.home')->name('home');
+    Route::prefix('settings/organization')->name('settings.organization.')->group(function (): void {
+        Route::get('/', OrganizationSettingsController::class)->name('show');
+        Route::patch('/', [OrganizationSettingsController::class, 'update'])->name('update');
+        Route::post('/invitations', [OrganizationInvitationController::class, 'store'])->name('invitations.store');
+        Route::delete('/invitations/{invitation}', [OrganizationInvitationController::class, 'destroy'])->name('invitations.destroy');
+        Route::delete('/members/{membership}', [MembershipController::class, 'destroy'])->middleware('password.confirm')->name('members.destroy');
+        Route::post('/ownership', OwnershipTransferController::class)->middleware('password.confirm')->name('ownership.transfer');
+    });
 });
