@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\Organization;
+use App\Models\OrganizationMembership;
+use App\Models\User;
 use App\Site\Publication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -44,6 +47,16 @@ expect()->extend('toBeOne', fn() => $this->toBe(1));
 | global functions to help you to reduce the number of lines of code in your test files.
 |
 */
+
+/** @return array{User, Organization, OrganizationMembership} */
+function memberFixture(string $role = 'member'): array
+{
+    $organization = Organization::factory()->create();
+    $user = User::factory()->create();
+    $membership = OrganizationMembership::factory()->for($organization)->for($user)->create(['role' => $role]);
+
+    return [$user, $organization, $membership];
+}
 
 function orchestrator(array $configOverrides = []): App\Council\CouncilOrchestrator
 {
