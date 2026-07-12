@@ -49,3 +49,9 @@ Composer appends trailing args to single-command scripts, so `vendor/bin/pest <p
 - The API is bearer-only. Create organization-scoped PATs in `/app/settings/tokens`.
 - `oast:review` requires `--organization=<id>`.
 - Recovery commands: `oast:user:password <email>` and `oast:user:verify <email>`.
+
+### M3B browser and self-host operations
+
+- Browser tests: `bun run test:js` (bare `bunx vitest run` fails by design — Vite Plus overrides `vitest` with `@voidzero-dev/vite-plus-test`, which ships no bin; `bun run test:js` invokes the underlying runner directly); production assets: `bun run build`.
+- Authenticated organization reviews live at `/app/reviews`; public `/reviews/*` remains publication-only.
+- The self-host image supervises FrankenPHP plus database queue listeners, persists `/var/lib/oast`, requires a stable non-placeholder `APP_KEY`, runs startup migrations, exposes `/up` readiness, and uses `docker/oast-worker-health` for queue health. `DB_QUEUE_RETRY_AFTER` must remain greater than the worker `--timeout=900`. See `docker/README.md`.
