@@ -6,17 +6,20 @@ namespace App\Http\Controllers;
 
 use App\Actions\Reviews\DeleteReviewAction;
 use App\Reviews\ScopedReviewResolver;
-use Illuminate\Http\Response;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 
 final class DeleteReviewController
 {
-    public function __invoke(string $review, ScopedReviewResolver $resolver, DeleteReviewAction $delete): Response
-    {
+    public function __invoke(
+        string $review,
+        ScopedReviewResolver $resolver,
+        DeleteReviewAction $delete,
+    ): RedirectResponse {
         $model = $resolver->findOrFail($review);
         Gate::authorize('delete', $model);
         $delete($model);
 
-        return response()->noContent();
+        return to_route('app.reviews.index')->with('status', 'Review deleted.');
     }
 }
