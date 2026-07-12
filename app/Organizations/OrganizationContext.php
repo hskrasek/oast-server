@@ -62,7 +62,12 @@ final class OrganizationContext
             return false;
         }
 
-        $organizationId = $this->membership()->organization_id;
+        try {
+            $organizationId = $this->membership()->organization_id;
+        } catch (MissingOrganizationMembership) {
+            return false;
+        }
+
         $member = OrganizationMembership::query()->where('user_id', $user->id)->where('organization_id', $organizationId)->exists();
         $owned = Review::query()->whereKey($review->id)->where('organization_id', $organizationId)->exists();
         if (! $member || ! $owned) {

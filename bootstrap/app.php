@@ -7,6 +7,7 @@ use App\Council\Exceptions\PanelException;
 use App\Http\Problems\ProblemResponse;
 use App\Http\Problems\ProblemType;
 use App\Reviews\ActiveReviewLimitExceeded;
+use App\Streaming\StreamLimitExceeded;
 use Crell\ApiProblem\ApiProblem;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -136,6 +137,20 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return ProblemResponse::from(
                 new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many active reviews.'),
+                429,
+                $headers,
+            );
+        });
+
+        $exceptions->render(function (StreamLimitExceeded $e, Request $request) use ($onApi): Response {
+            $headers = ['Retry-After' => (string) $e->retryAfter];
+
+            if (! $onApi($request)) {
+                return response('', 429, $headers);
+            }
+
+            return ProblemResponse::from(
+                new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many concurrent event streams.'),
                 429,
                 $headers,
             );

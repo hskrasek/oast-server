@@ -11,6 +11,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Override;
 
+/**
+ * @property int $id
+ * @property int $organization_id
+ * @property int $user_id
+ * @property OrganizationRole $role
+ */
 final class OrganizationMembership extends Model
 {
     /** @use HasFactory<OrganizationMembershipFactory> */

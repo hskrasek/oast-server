@@ -30,12 +30,13 @@ namespace {
     beforeEach(function (): void {
         config(['oast.api_domain' => 'api.oast.test']);
 
-        [, , $token] = apiTokenFixture();
+        [, $organization, $token] = apiTokenFixture();
+        $this->organization = $organization;
         $this->withToken($token);
     });
 
     it('streams stored events as SSE frames and closes on terminal', function (): void {
-        $review = Review::factory()->create(['status' => 'complete']);
+        $review = Review::factory()->for($this->organization)->create(['status' => 'complete']);
         $review->appendEvent('review.queued', ['mode' => 'council']);
         $review->appendEvent('review.completed', ['findings' => [], 'total_cost_usd' => 0.1]);
 
@@ -50,7 +51,7 @@ namespace {
     });
 
     it('replays only events after Last-Event-ID', function (): void {
-        $review = Review::factory()->create(['status' => 'complete']);
+        $review = Review::factory()->for($this->organization)->create(['status' => 'complete']);
         $first = $review->appendEvent('review.queued', []);
         $review->appendEvent('review.completed', ['findings' => []]);
 
@@ -73,7 +74,7 @@ namespace {
 
     it('polls while the connection is open, then stops once it drops', function (): void {
         Sleep::fake();
-        $review = Review::factory()->create(['status' => 'running']);
+        $review = Review::factory()->for($this->organization)->create(['status' => 'running']);
         $review->appendEvent('review.queued', ['mode' => 'council']);
 
         $body = $this->get("https://{$this->apiHost()}/reviews/{$review->id}/events")
