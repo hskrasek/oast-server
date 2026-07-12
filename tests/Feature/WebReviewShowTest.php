@@ -20,7 +20,11 @@ it('renders retained source and the same-origin session event route', function (
         ->assertSee(route('app.reviews.events', $review->id))
         ->assertSee('Council progress')
         ->assertSee('Inline specification')
-        ->assertDontSee('api.oast.test');
+        ->assertDontSee('api.oast.test')
+        // Alpine auto-invokes init() on x-data components; an explicit x-init="init"
+        // would double-invoke it (two EventSource connections, doubled progress, doubled
+        // lease consumption). Pin its absence so the double-init defect can't reappear.
+        ->assertDontSee('x-init="init"', false);
 });
 
 it('returns 404 for a review in another organization', function (): void {

@@ -4,7 +4,7 @@
         status: @js($review->status),
         findings: @js($review->findings ?? [], JSON_UNESCAPED_SLASHES),
         spec: @js((string) $review->spec, JSON_UNESCAPED_SLASHES)
-    })" x-init="init" @alpine:destroy.window="destroy">
+    })">
         <header class="o-page-head">
             <div><p class="o-label">review #{{ $review->id }}</p><h1 class="o-headline">{{ $review->spec_ref ?: 'Pasted specification' }}</h1></div>
             <div class="o-page-actions">

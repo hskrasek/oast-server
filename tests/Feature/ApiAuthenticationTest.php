@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Bus;
 it('rejects anonymous and session-only API requests with problem details', function (): void {
     $this->postJson("https://{$this->apiHost()}/reviews", ['spec' => 'openapi: 3.1.0'])
         ->assertUnauthorized()->assertHeader('Content-Type', 'application/problem+json')
+        ->assertHeader('WWW-Authenticate', 'Bearer')
         ->assertJsonPath('type', ProblemType::Unauthenticated->value);
     [$user] = memberFixture();
     $this->actingAs($user)->postJson("https://{$this->apiHost()}/reviews", ['spec' => 'openapi: 3.1.0'])->assertUnauthorized();

@@ -105,7 +105,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            return ProblemResponse::from(new ApiProblem('Unauthenticated', ProblemType::Unauthenticated->value)->setDetail('A valid bearer token is required.'), 401);
+            return ProblemResponse::from(new ApiProblem('Unauthenticated', ProblemType::Unauthenticated->value)->setDetail('A valid bearer token is required.'), 401, ['WWW-Authenticate' => 'Bearer']);
         });
 
         $exceptions->render(function (Illuminate\Auth\Access\AuthorizationException|Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException $e, Request $request) use ($onApi): ?Response {
