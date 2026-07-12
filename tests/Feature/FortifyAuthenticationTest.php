@@ -2,10 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Models\Installation;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+
+// Fortify routes are gated behind EnsureInstallationBootstrapped (Task 4);
+// these flows only exist once the installation is bootstrapped.
+beforeEach(fn() => Installation::query()->whereKey(1)->update(['bootstrapped_at' => now()]));
 
 it('logs in by canonical email and logs out only by post', function (): void {
     $user = User::factory()->create(['email' => 'owner@example.test', 'password' => 'correct horse battery staple']);

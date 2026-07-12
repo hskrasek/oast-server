@@ -39,6 +39,18 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         $middleware->append(App\Http\Middleware\CanonicalizeEmailInput::class);
+
+        $middleware->alias(['installation' => App\Http\Middleware\EnsureInstallationBootstrapped::class]);
+
+        // Fortify's auth-protected entry points (email/verify, user/confirm-password)
+        // also carry EnsureInstallationBootstrapped via fortify.middleware. It must
+        // outrank Authenticate so a pre-bootstrap request lands on /setup rather than
+        // /login. The priority list slots Authenticate via the AuthenticatesRequests
+        // contract it implements, so prepend ours just ahead of that contract.
+        $middleware->prependToPriorityList(
+            before: Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: App\Http\Middleware\EnsureInstallationBootstrapped::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Map domain/validation failures to RFC 9457 problem+json on the API host.
