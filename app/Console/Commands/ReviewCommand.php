@@ -16,7 +16,7 @@ use Override;
 final class ReviewCommand extends Command
 {
     #[Override]
-    protected $signature = 'oast:review {spec : Path to the OpenAPI spec file} {--baseline : Run a single-model baseline} {--dimension=domain-modeling : Review dimension (domain-modeling|resource-relationships|workflows)} {--timeout=900 : Seconds to wait for completion}';
+    protected $signature = 'oast:review {spec : Path to the OpenAPI spec file} {--baseline : Run a single-model baseline} {--dimension=domain-modeling : Review dimension (domain-modeling|resource-relationships|workflows)} {--timeout=900 : Seconds to wait for completion} {--organization= : Required organization ID that owns the review}';
 
     #[Override]
     protected $description = 'Convene the Council on an OpenAPI spec (or a single-model baseline).';
@@ -24,6 +24,20 @@ final class ReviewCommand extends Command
     public function handle(CreateReviewAction $review): int
     {
         $path = $this->argument('spec');
+
+        $organizationId = $this->option('organization');
+        if (! is_string($organizationId) || mb_trim($organizationId) === '') {
+            $this->error('The --organization option is required.');
+
+            return self::FAILURE;
+        }
+
+        $organization = Organization::query()->find($organizationId);
+        if (! $organization instanceof Organization) {
+            $this->error('Organization not found.');
+
+            return self::FAILURE;
+        }
 
         if (! is_file($path)) {
             $this->error('Spec file not found: ' . $path);
@@ -42,9 +56,6 @@ final class ReviewCommand extends Command
         $mode = $this->option('baseline') ? ReviewMode::Baseline : ReviewMode::Council;
         $this->info(sprintf('Convening %s review (%s) for %s ...', $mode->value, $dimension->value, $path));
 
-        // TODO(Task 12): replace this default-organization resolution with the
-        // required --organization option and explicit owner lookup.
-        $organization = Organization::query()->firstOrFail();
         $created = $review(File::get($path), $mode, $organization, null, $path, $dimension);
 
         $cursor = 0;

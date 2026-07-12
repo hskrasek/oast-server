@@ -72,6 +72,14 @@ function apiTokenFixture(): array
     return [$user, $organization, $created->plainTextToken];
 }
 
+function fixtureSpecPath(): string
+{
+    $path = sys_get_temp_dir() . '/oast-spec-' . uniqid() . '.yaml';
+    file_put_contents($path, 'openapi: 3.1.0');
+
+    return $path;
+}
+
 function orchestrator(array $configOverrides = []): App\Council\CouncilOrchestrator
 {
     $config = array_merge([
