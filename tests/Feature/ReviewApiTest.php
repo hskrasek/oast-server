@@ -12,7 +12,7 @@ beforeEach(function (): void {
     config(['oast.api_domain' => 'api.oast.test']);
     Http::fake(['openrouter.ai/api/v1/models' => Http::response(['data' => []])]);
 
-    [, , $token] = apiTokenFixture();
+    [, $this->organization, $token] = apiTokenFixture();
     $this->withToken($token);
 });
 
@@ -90,7 +90,7 @@ it('persists an error row when the panel cannot reach quorum', function () {
 });
 
 it('shows a review by id', function () {
-    $review = Review::factory()->create(['status' => 'complete', 'mode' => 'council']);
+    $review = Review::factory()->for($this->organization)->create(['status' => 'complete', 'mode' => 'council']);
 
     $this->getJson("https://{$this->apiHost()}/reviews/{$review->id}")
         ->assertOk()

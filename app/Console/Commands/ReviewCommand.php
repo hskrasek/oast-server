@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Actions\Reviews\CreateReviewAction;
 use App\Council\Dimension;
 use App\Council\ReviewMode;
+use App\Models\Organization;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Sleep;
@@ -41,7 +42,10 @@ final class ReviewCommand extends Command
         $mode = $this->option('baseline') ? ReviewMode::Baseline : ReviewMode::Council;
         $this->info(sprintf('Convening %s review (%s) for %s ...', $mode->value, $dimension->value, $path));
 
-        $created = $review(File::get($path), $mode, $path, $dimension);
+        // TODO(Task 12): replace this default-organization resolution with the
+        // required --organization option and explicit owner lookup.
+        $organization = Organization::query()->firstOrFail();
+        $created = $review(File::get($path), $mode, $organization, null, $path, $dimension);
 
         $cursor = 0;
         $deadline = now()->addSeconds((int) $this->option('timeout'));

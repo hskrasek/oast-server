@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Http;
 
 beforeEach(function (): void {
     Http::fake(['openrouter.ai/api/v1/models' => Http::response(['data' => []])]);
+    // The command resolves the owning organization from the database until Task 12
+    // introduces the required --organization option; give it one to own the review.
+    App\Models\Organization::factory()->create();
 });
 
 it('fails when the spec file is missing', function (): void {

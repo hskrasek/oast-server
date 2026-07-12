@@ -6,6 +6,7 @@ use App\Council\Exceptions\JudgeException;
 use App\Council\Exceptions\PanelException;
 use App\Http\Problems\ProblemResponse;
 use App\Http\Problems\ProblemType;
+use App\Reviews\ActiveReviewLimitExceeded;
 use Crell\ApiProblem\ApiProblem;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -124,6 +125,20 @@ return Application::configure(basePath: dirname(__DIR__))
             $retry = is_scalar($retryAfter) ? (string) $retryAfter : '60';
 
             return ProblemResponse::from(new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many requests.'), 429, ['Retry-After' => $retry]);
+        });
+
+        $exceptions->render(function (ActiveReviewLimitExceeded $e, Request $request) use ($onApi): Response {
+            $headers = ['Retry-After' => (string) $e->retryAfter];
+
+            if (! $onApi($request)) {
+                return response('Too many active reviews.', 429, $headers);
+            }
+
+            return ProblemResponse::from(
+                new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many active reviews.'),
+                429,
+                $headers,
+            );
         });
 
         $exceptions->render(function (NotFoundHttpException $e, Request $request) use ($onApi): ?Response {

@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 use App\Http\Controllers\AccountPasswordController;
 use App\Http\Controllers\AccountSettingsController;
+use App\Http\Controllers\DeleteReviewController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\MembershipController;
 use App\Http\Controllers\OrganizationInvitationController;
 use App\Http\Controllers\OrganizationSettingsController;
 use App\Http\Controllers\OwnershipTransferController;
+use App\Http\Controllers\ReviewController;
+use App\Http\Controllers\ReviewEventsController;
 use App\Http\Controllers\SetupAuthorizationController;
 use App\Http\Controllers\SetupController;
+use App\Http\Controllers\ShowReviewController;
 use App\Http\Controllers\Site\ConfirmSubscriptionController;
 use App\Http\Controllers\Site\HomeController;
 use App\Http\Controllers\Site\OgImageController;
@@ -72,6 +76,12 @@ Route::prefix('app')->name('app.')->middleware(['installation', 'auth', 'verifie
     Route::put('/settings/account/password', AccountPasswordController::class)->middleware('password.confirm')->name('settings.account.password.update');
     Route::middleware('organization')->group(function (): void {
         Route::view('/', 'app.home')->name('home');
+        Route::prefix('reviews')->name('reviews.')->group(function (): void {
+            Route::post('/', [ReviewController::class, 'store'])->name('store');
+            Route::get('/{review}', ShowReviewController::class)->name('show');
+            Route::get('/{review}/events', ReviewEventsController::class)->name('events');
+            Route::delete('/{review}', DeleteReviewController::class)->name('destroy');
+        });
         Route::get('/settings/tokens', [TokenSettingsController::class, 'index'])->name('settings.tokens.index');
         Route::post('/settings/tokens', [TokenSettingsController::class, 'store'])->middleware('password.confirm')->name('settings.tokens.store');
         Route::delete('/settings/tokens/{token}', [TokenSettingsController::class, 'destroy'])->middleware('password.confirm')->name('settings.tokens.destroy');
