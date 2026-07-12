@@ -13,7 +13,9 @@
         "aws/aws-sdk-php": "^3.387",
         "crell/api-problem": "^3.8",
         "laravel/ai": "^0.8.1",
+        "laravel/fortify": "^1.37",
         "laravel/framework": "^13.16.1",
+        "laravel/sanctum": "^4.3",
         "laravel/tinker": "^3.0.2",
         "nunomaduro/essentials": "^1.2"
     },

@@ -16,10 +16,6 @@
         <include>
             <directory>app</directory>
         </include>
-        <exclude>
-            <!-- Stock Laravel auth scaffolding, unused by M0. -->
-            <file>app/Models/User.php</file>
-        </exclude>
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
