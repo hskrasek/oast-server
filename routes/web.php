@@ -15,6 +15,7 @@ use App\Http\Controllers\OrganizationInvitationController;
 use App\Http\Controllers\OrganizationSettingsController;
 use App\Http\Controllers\OwnershipTransferController;
 use App\Http\Controllers\App\ShowReviewController;
+use App\Http\Controllers\ReadinessController;
 use App\Http\Controllers\ReviewEventsController;
 use App\Http\Controllers\SetupAuthorizationController;
 use App\Http\Controllers\SetupController;
@@ -27,6 +28,8 @@ use App\Http\Controllers\Site\SubscribeController;
 use App\Http\Controllers\TokenSettingsController;
 use App\Site\Og\OgTemplate;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/up', ReadinessController::class)->name('up');
 
 Route::get('/', HomeController::class)->name('home');
 Route::view('/why', 'site.why')->name('why');
