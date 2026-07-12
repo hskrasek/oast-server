@@ -6,6 +6,8 @@ namespace App\Providers;
 
 use App\Council\CouncilOrchestrator;
 use App\Council\FindingValidator;
+use App\Identity\RegistrationPolicy;
+use App\Identity\SelfHostedRegistrationPolicy;
 use App\Organizations\OrganizationContext;
 use App\Site\Newsletter\NewsletterContacts;
 use App\Site\Newsletter\SesNewsletterContacts;
@@ -50,6 +52,8 @@ final class AppServiceProvider extends ServiceProvider
         );
 
         $this->app->scoped(OrganizationContext::class);
+
+        $this->app->bind(RegistrationPolicy::class, SelfHostedRegistrationPolicy::class);
     }
 
     /**
