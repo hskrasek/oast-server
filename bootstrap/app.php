@@ -40,7 +40,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->append(App\Http\Middleware\CanonicalizeEmailInput::class);
 
-        $middleware->alias(['installation' => App\Http\Middleware\EnsureInstallationBootstrapped::class]);
+        $middleware->alias([
+            'installation' => App\Http\Middleware\EnsureInstallationBootstrapped::class,
+            'verified.configured' => App\Http\Middleware\EnsureEmailIsVerifiedWhenConfigured::class,
+            'organization' => App\Http\Middleware\EnsureOrganizationMembership::class,
+            // Laravel 13 and Sanctum 4.3 do not register these aliases automatically.
+            'ability' => Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
+            'abilities' => Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+        ]);
 
         // Fortify's auth-protected entry points (email/verify, user/confirm-password)
         // also carry EnsureInstallationBootstrapped via fortify.middleware. It must

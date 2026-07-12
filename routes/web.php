@@ -52,6 +52,6 @@ Route::get('/subscribe/confirm/{email}', ConfirmSubscriptionController::class)
 Route::get('/setup', [SetupController::class, 'show'])->name('setup.show');
 Route::post('/setup/authorize', SetupAuthorizationController::class)->middleware('throttle:5,1')->name('setup.authorize');
 Route::post('/setup', [SetupController::class, 'store'])->middleware('throttle:5,1')->name('setup.store');
-Route::prefix('app')->name('app.')->middleware(['installation', 'auth'])->group(function (): void {
+Route::prefix('app')->name('app.')->middleware(['installation', 'auth', 'verified.configured', 'organization'])->group(function (): void {
     Route::view('/', 'app.home')->name('home');
 });

@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Council\CouncilOrchestrator;
 use App\Council\FindingValidator;
+use App\Organizations\OrganizationContext;
 use App\Site\Newsletter\NewsletterContacts;
 use App\Site\Newsletter\SesNewsletterContacts;
 use App\Site\Og\CloudflareOgImageRenderer;
@@ -47,6 +48,8 @@ final class AppServiceProvider extends ServiceProvider
                 config()->string('services.cloudflare.browser_token'),
             ),
         );
+
+        $this->app->scoped(OrganizationContext::class);
     }
 
     /**
