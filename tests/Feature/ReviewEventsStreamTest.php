@@ -27,7 +27,12 @@ namespace {
     use Carbon\CarbonInterval;
     use Illuminate\Support\Sleep;
 
-    beforeEach(fn() => config(['oast.api_domain' => 'api.oast.test']));
+    beforeEach(function (): void {
+        config(['oast.api_domain' => 'api.oast.test']);
+
+        [, , $token] = apiTokenFixture();
+        $this->withToken($token);
+    });
 
     it('streams stored events as SSE frames and closes on terminal', function (): void {
         $review = Review::factory()->create(['status' => 'complete']);

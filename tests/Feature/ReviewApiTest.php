@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Http;
 beforeEach(function (): void {
     config(['oast.api_domain' => 'api.oast.test']);
     Http::fake(['openrouter.ai/api/v1/models' => Http::response(['data' => []])]);
+
+    [, , $token] = apiTokenFixture();
+    $this->withToken($token);
 });
 
 it('returns 202 with a Location header and dispatches the batch', function () {

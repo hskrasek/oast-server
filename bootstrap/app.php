@@ -99,6 +99,33 @@ return Application::configure(basePath: dirname(__DIR__))
             return ProblemResponse::from($problem, 502);
         });
 
+        $exceptions->render(function (Illuminate\Auth\AuthenticationException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            return ProblemResponse::from(new ApiProblem('Unauthenticated', ProblemType::Unauthenticated->value)->setDetail('A valid bearer token is required.'), 401);
+        });
+
+        $exceptions->render(function (Illuminate\Auth\Access\AuthorizationException|Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            return ProblemResponse::from(new ApiProblem('Forbidden', ProblemType::Forbidden->value)->setDetail('The credential cannot perform this action.'), 403);
+        });
+
+        $exceptions->render(function (Illuminate\Http\Exceptions\ThrottleRequestsException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $retryAfter = $e->getHeaders()['Retry-After'] ?? '60';
+            $retry = is_scalar($retryAfter) ? (string) $retryAfter : '60';
+
+            return ProblemResponse::from(new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many requests.'), 429, ['Retry-After' => $retry]);
+        });
+
         $exceptions->render(function (NotFoundHttpException $e, Request $request) use ($onApi): ?Response {
             if (! $onApi($request)) {
                 return null;

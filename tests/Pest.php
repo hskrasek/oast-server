@@ -58,6 +58,20 @@ function memberFixture(string $role = 'member'): array
     return [$user, $organization, $membership];
 }
 
+/**
+ * Issue a valid organization-scoped bearer token for the given (or a fresh)
+ * member fixture so API feature tests can authenticate the bearer-only surface.
+ *
+ * @return array{User, Organization, string}
+ */
+function apiTokenFixture(): array
+{
+    [$user, $organization] = memberFixture();
+    $created = app(App\Tokens\PersonalAccessTokenService::class)->create($user, $organization, 'test', null);
+
+    return [$user, $organization, $created->plainTextToken];
+}
+
 function orchestrator(array $configOverrides = []): App\Council\CouncilOrchestrator
 {
     $config = array_merge([
