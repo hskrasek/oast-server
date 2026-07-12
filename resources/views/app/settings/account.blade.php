@@ -1,0 +1,5 @@
+<x-auth-layout title="Account settings"><h1 class="o-headline">Account settings</h1><x-form-errors />
+<form method="POST" action="{{ route('app.settings.account.update') }}" class="o-form">@csrf @method('PATCH')<label for="name">Name</label><input class="o-input" id="name" name="name" value="{{ $user->name }}" required>
+<label for="email">Email</label><input class="o-input" id="email" name="email" type="email" value="{{ $user->email }}" required><button class="o-btn" type="submit">Save account</button></form>
+<form method="POST" action="{{ route('app.settings.account.password.update') }}" class="o-form">@csrf @method('PUT')<label for="current_password">Current password</label><input class="o-input" id="current_password" name="current_password" type="password" required>
+<label for="password">New password</label><input class="o-input" id="password" name="password" type="password" required><label for="password_confirmation">Confirm password</label><input class="o-input" id="password_confirmation" name="password_confirmation" type="password" required><button class="o-btn" type="submit">Change password</button></form></x-auth-layout>
