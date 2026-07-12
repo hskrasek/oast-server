@@ -37,6 +37,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_PROTO
                 | Request::HEADER_X_FORWARDED_PORT,
         );
+
+        $middleware->append(App\Http\Middleware\CanonicalizeEmailInput::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Map domain/validation failures to RFC 9457 problem+json on the API host.
