@@ -444,3 +444,64 @@
         @apply border-b border-hairline px-3 py-3;
     }
 }
+
+@layer components {
+    [x-cloak] {
+        display: none !important;
+    }
+    .o-app-page {
+        @apply mx-auto flex w-full max-w-page flex-col gap-7 px-6 py-10;
+    }
+    .o-page-head {
+        @apply flex flex-col justify-between gap-5 sm:flex-row sm:items-end;
+    }
+    .o-state-card {
+        @apply flex flex-col items-start gap-4 rounded-card border border-edge bg-raised p-6 font-mono text-mono-ui text-muted;
+    }
+    .o-review-list {
+        @apply overflow-hidden rounded-card border border-edge;
+    }
+    .o-review-row {
+        @apply grid gap-3 border-b border-hairline px-5 py-4 last:border-b-0 md:grid-cols-[1fr_110px_100px_auto] md:items-center;
+    }
+    .o-review-row:hover {
+        @apply bg-raised;
+    }
+    .o-review-row a {
+        @apply no-underline;
+    }
+    .o-review-row strong {
+        @apply block font-mono text-mono-ui font-medium text-ink;
+    }
+    .o-review-row small {
+        @apply mt-1 block font-mono text-mono-small text-subtle;
+    }
+    .o-status {
+        @apply w-fit rounded-badge border border-edge-strong px-2 py-1 font-mono text-badge font-semibold uppercase tracking-badge;
+    }
+    .o-status-queued,
+    .o-status-running {
+        @apply text-muted;
+    }
+    .o-status-judging {
+        @apply border-amber text-amber;
+    }
+    .o-status-complete {
+        @apply border-success text-success;
+    }
+    .o-status-error {
+        @apply border-danger text-danger;
+    }
+    .o-review-cost {
+        @apply font-mono text-mono-ui text-ember md:text-right;
+    }
+    .o-review-error {
+        @apply font-mono text-mono-small text-danger md:col-span-4;
+    }
+    .o-btn-danger {
+        @apply border-danger bg-transparent text-danger;
+    }
+    .o-btn-danger:hover {
+        @apply bg-ember text-on-accent;
+    }
+}

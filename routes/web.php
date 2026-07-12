@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\AccountPasswordController;
 use App\Http\Controllers\AccountSettingsController;
+use App\Http\Controllers\App\ReviewIndexController as AppReviewIndexController;
 use App\Http\Controllers\DeleteReviewController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\InvitationController;
@@ -76,12 +77,6 @@ Route::prefix('app')->name('app.')->middleware(['installation', 'auth', 'verifie
     Route::put('/settings/account/password', AccountPasswordController::class)->middleware('password.confirm')->name('settings.account.password.update');
     Route::middleware('organization')->group(function (): void {
         Route::view('/', 'app.home')->name('home');
-        Route::prefix('reviews')->name('reviews.')->group(function (): void {
-            Route::post('/', [ReviewController::class, 'store'])->name('store');
-            Route::get('/{review}', ShowReviewController::class)->name('show');
-            Route::get('/{review}/events', ReviewEventsController::class)->name('events');
-            Route::delete('/{review}', DeleteReviewController::class)->name('destroy');
-        });
         Route::get('/settings/tokens', [TokenSettingsController::class, 'index'])->name('settings.tokens.index');
         Route::post('/settings/tokens', [TokenSettingsController::class, 'store'])->middleware('password.confirm')->name('settings.tokens.store');
         Route::delete('/settings/tokens/{token}', [TokenSettingsController::class, 'destroy'])->middleware('password.confirm')->name('settings.tokens.destroy');
@@ -95,3 +90,24 @@ Route::prefix('app')->name('app.')->middleware(['installation', 'auth', 'verifie
         });
     });
 });
+
+Route::prefix('app/reviews')
+    ->name('app.reviews.')
+    ->middleware(['installation', 'auth', 'verified.configured', 'organization'])
+    ->group(function (): void {
+        Route::get('/', AppReviewIndexController::class)->name('index');
+        // ponytail: CreateReviewController lands with M3B T4. A closure keeps the
+        // named route resolvable now (this test suite generates its URL) without a
+        // forward reference to a class that doesn't exist yet — that would fatal
+        // route-file load (Router::createRoute() -> RouteAction::parse() resolves
+        // invokable-controller strings eagerly inside a route group) and fail
+        // PHPStan's class.notFound check. T4 replaces this with the real controller.
+        Route::get('/create', fn() => abort(501))->name('create');
+        // M3A store/show stay on the existing controllers until T4/T5 replace them —
+        // repointing now would 500 AbuseControlsTest, which exercises the real
+        // abuse-ceiling behavior through the M3A ReviewController@store action.
+        Route::post('/', [ReviewController::class, 'store'])->name('store');
+        Route::get('/{review}', ShowReviewController::class)->name('show');
+        Route::get('/{review}/events', ReviewEventsController::class)->name('events');
+        Route::delete('/{review}', DeleteReviewController::class)->name('destroy');
+    });
