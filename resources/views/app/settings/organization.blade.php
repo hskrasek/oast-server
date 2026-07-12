@@ -1,4 +1,4 @@
-<x-auth-layout title="Organization settings"><h1 class="o-headline">Organization settings</h1><x-form-errors />
+<x-app-layout title="Organization settings"><h1 class="o-headline">Organization settings</h1>
 @can('update', $organization)
 <form method="POST" action="{{ route('app.settings.organization.update') }}" class="o-form">@csrf @method('PATCH')
 <label for="name">Organization name</label><input class="o-input" id="name" name="name" value="{{ $organization->name }}" required><button class="o-btn" type="submit">Save</button></form>
@@ -14,4 +14,4 @@
 <form method="POST" action="{{ route('app.settings.organization.invitations.store') }}">@csrf<label for="invite_email">Email</label><input class="o-input" id="invite_email" name="email" type="email" required><button class="o-btn" type="submit">Invite</button></form>
 @foreach($organization->invitations as $invitation)<form method="POST" action="{{ route('app.settings.organization.invitations.destroy', $invitation) }}">@csrf @method('DELETE')<span>{{ $invitation->email }}</span><button type="submit">Revoke</button></form>@endforeach
 @endcan
-</x-auth-layout>
+</x-app-layout>
