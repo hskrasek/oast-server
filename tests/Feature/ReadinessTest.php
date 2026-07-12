@@ -2,8 +2,24 @@
 
 declare(strict_types=1);
 
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Database\Migrations\MigrationRepositoryInterface;
 use Illuminate\Database\Migrations\Migrator;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
+
+it('does not carry stateful session/cookie/CSRF middleware', function (): void {
+    $route = Route::getRoutes()->getByName('up');
+    $effective = app('router')->gatherRouteMiddleware($route);
+
+    expect($effective)
+        ->not->toContain(StartSession::class)
+        ->not->toContain(AddQueuedCookiesToResponse::class)
+        ->not->toContain(ShareErrorsFromSession::class)
+        ->not->toContain(PreventRequestForgery::class);
+});
 
 it('is ready only when database and migrations are current', function (): void {
     $this->getJson('/up')->assertOk()->assertExactJson(['status' => 'ready']);

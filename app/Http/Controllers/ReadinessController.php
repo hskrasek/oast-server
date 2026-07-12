@@ -26,7 +26,9 @@ final class ReadinessController
             }
 
             return response()->json(['status' => 'ready']);
-        } catch (Throwable) {
+        } catch (Throwable $throwable) {
+            report($throwable);
+
             return response()->json(['status' => 'not ready'], 503);
         }
     }

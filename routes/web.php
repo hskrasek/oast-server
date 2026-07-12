@@ -29,7 +29,19 @@ use App\Http\Controllers\TokenSettingsController;
 use App\Site\Og\OgTemplate;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/up', ReadinessController::class)->name('up');
+// Polled by container healthchecks (Task 8), possibly cookie-less. Outside
+// session middleware for the same reason as /og/{file}.png below: on
+// SESSION_DRIVER=database, StartSession would write a sessions row on every
+// poll and — on a genuinely fresh, unmigrated database — 500 before the
+// controller's try/catch ever runs, since sessions/users share a migration.
+Route::get('/up', ReadinessController::class)
+    ->withoutMiddleware([
+        Illuminate\Session\Middleware\StartSession::class,
+        Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
+    ])
+    ->name('up');
 
 Route::get('/', HomeController::class)->name('home');
 Route::view('/why', 'site.why')->name('why');
