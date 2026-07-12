@@ -16,7 +16,7 @@ it('serializes and rejects the organization active-review ceiling for API and br
     $this->withToken($token->plainTextToken)->postJson("https://{$this->apiHost()}/reviews", ['spec' => 'openapi: 3.1.0'])
         ->assertTooManyRequests()->assertHeader('Retry-After', '60')
         ->assertHeader('Content-Type', 'application/problem+json');
-    $this->actingAs($user)->post(route('app.reviews.store'), ['spec' => 'openapi: 3.1.0'])
+    $this->actingAs($user)->post(route('app.reviews.store'), ['spec' => 'openapi: 3.1.0', 'mode' => 'council', 'dimension' => 'domain-modeling'])
         ->assertTooManyRequests()->assertHeader('Retry-After', '60')->assertSee('Too many active reviews.');
     expect(Review::query()->where('organization_id', $organization->id)->count())->toBe(1);
 });

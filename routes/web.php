@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Http\Controllers\AccountPasswordController;
 use App\Http\Controllers\AccountSettingsController;
+use App\Http\Controllers\App\CreateReviewController;
 use App\Http\Controllers\App\ReviewIndexController as AppReviewIndexController;
+use App\Http\Controllers\App\StoreReviewController;
 use App\Http\Controllers\DeleteReviewController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\InvitationController;
@@ -12,7 +14,6 @@ use App\Http\Controllers\MembershipController;
 use App\Http\Controllers\OrganizationInvitationController;
 use App\Http\Controllers\OrganizationSettingsController;
 use App\Http\Controllers\OwnershipTransferController;
-use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ReviewEventsController;
 use App\Http\Controllers\SetupAuthorizationController;
 use App\Http\Controllers\SetupController;
@@ -96,17 +97,8 @@ Route::prefix('app/reviews')
     ->middleware(['installation', 'auth', 'verified.configured', 'organization'])
     ->group(function (): void {
         Route::get('/', AppReviewIndexController::class)->name('index');
-        // ponytail: CreateReviewController lands with M3B T4. A closure keeps the
-        // named route resolvable now (this test suite generates its URL) without a
-        // forward reference to a class that doesn't exist yet — that would fatal
-        // route-file load (Router::createRoute() -> RouteAction::parse() resolves
-        // invokable-controller strings eagerly inside a route group) and fail
-        // PHPStan's class.notFound check. T4 replaces this with the real controller.
-        Route::get('/create', fn() => abort(501))->name('create');
-        // M3A store/show stay on the existing controllers until T4/T5 replace them —
-        // repointing now would 500 AbuseControlsTest, which exercises the real
-        // abuse-ceiling behavior through the M3A ReviewController@store action.
-        Route::post('/', [ReviewController::class, 'store'])->name('store');
+        Route::get('/create', CreateReviewController::class)->name('create');
+        Route::post('/', StoreReviewController::class)->name('store');
         Route::get('/{review}', ShowReviewController::class)->name('show');
         Route::get('/{review}/events', ReviewEventsController::class)->name('events');
         Route::delete('/{review}', DeleteReviewController::class)->name('destroy');

@@ -505,3 +505,29 @@
         @apply bg-ember text-on-accent;
     }
 }
+
+@layer components {
+    .o-review-form {
+        @apply flex flex-col gap-6 rounded-card border border-edge bg-raised p-6;
+    }
+    .o-source-tabs {
+        @apply flex gap-2;
+    }
+    .o-source-tabs button {
+        @apply rounded-control border border-edge-strong px-4 py-2 font-mono text-mono-ui text-muted;
+    }
+    .o-source-tabs button[aria-selected="true"] {
+        @apply border-ember text-ember;
+    }
+    .o-field {
+        @apply flex flex-col gap-2 font-mono text-mono-ui text-muted;
+    }
+    .o-field textarea,
+    .o-field select,
+    .o-field input {
+        @apply rounded-control border border-edge-strong bg-sunken px-3 py-3 font-mono text-mono-ui text-ink;
+    }
+    .o-review-options {
+        @apply grid gap-4 sm:grid-cols-2;
+    }
+}
