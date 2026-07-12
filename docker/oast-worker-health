@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+expected="${OAST_QUEUE_WORKERS:-1}"
+running="$(supervisorctl status 'queue:*' 2>/dev/null | awk '$2 == "RUNNING" { count++ } END { print count + 0 }')"
+[ "$running" -eq "$expected" ]
