@@ -21,6 +21,26 @@ it('returns a browser 429 before streaming when the user ceiling is full', funct
     }
 });
 
+it('returns an API problem+json 429 before streaming when the token stream ceiling is full', function (): void {
+    config(['oast.max_concurrent_streams' => 1]);
+    [$user, $organization] = memberFixture();
+    $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
+    $review = Review::factory()->for($organization)->create(['status' => 'running']);
+    $lease = app(App\Streaming\StreamLeaseManager::class)->acquire('token:' . $token->accessToken->id);
+    try {
+        $this->withToken($token->plainTextToken)
+            ->getJson("https://{$this->apiHost()}/reviews/{$review->id}/events")
+            ->assertTooManyRequests()
+            ->assertHeader('Retry-After', '60')
+            ->assertHeader('Content-Type', 'application/problem+json')
+            ->assertJsonPath('type', App\Http\Problems\ProblemType::RateLimited->value)
+            ->assertJsonPath('title', 'Rate limited')
+            ->assertJsonPath('detail', 'Too many concurrent event streams.');
+    } finally {
+        $lease->release();
+    }
+});
+
 it('returns 404 before streaming a cross organization review', function (): void {
     [$user, $organization] = memberFixture();
     [, $other] = memberFixture();
