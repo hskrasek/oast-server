@@ -21,7 +21,7 @@ jobs:
           path-to-signatures: signatures/cla.json
           path-to-document: https://github.com/hskrasek/oast-server/blob/main/CLA.md
           branch: cla-signatures
-          allowlist: hskrasek, dependabot[bot]
+          allowlist: hskrasek, claude, dependabot[bot]
           custom-notsigned-prcomment: >
             Thanks for the contribution! Before it can be merged, please sign the
             [Contributor License Agreement](https://github.com/hskrasek/oast-server/blob/main/CLA.md)
