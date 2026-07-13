@@ -18,6 +18,9 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
       - run: bun run test:js
+        env:
+          # vitest boots a Vite dev server internally; laravel-vite-plugin refuses that when CI is set
+          LARAVEL_BYPASS_ENV_CHECK: 1
       - run: composer install --prefer-dist --no-interaction
       - run: composer test
       - run: docker build --tag oast-server:ci .
