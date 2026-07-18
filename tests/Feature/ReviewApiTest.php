@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Http;
 beforeEach(function (): void {
     config(['oast.api_domain' => 'api.oast.test']);
     Http::fake(['openrouter.ai/api/v1/models' => Http::response(['data' => []])]);
+
+    [, $this->organization, $token] = apiTokenFixture();
+    $this->withToken($token);
 });
 
 it('returns 202 with a Location header and dispatches the batch', function () {
@@ -39,6 +42,17 @@ it('returns a problem+json validation error when spec is missing', function () {
         ->assertJsonPath('type', App\Http\Problems\ProblemType::Validation)
         ->assertJsonPath('status', 422)
         ->assertJsonPath('errors.spec.0', fn($msg) => filled($msg));
+});
+
+it('rejects an oversized or unparseable spec as problem+json validation', function () {
+    config()->set('oast.max_spec_bytes', 32);
+    $this->postJson("https://{$this->apiHost()}/reviews", [
+        'spec' => str_repeat('a: b', 20), 'mode' => 'council',
+    ])->assertStatus(422)->assertJsonPath('errors.spec.0', fn($msg) => filled($msg));
+
+    $this->postJson("https://{$this->apiHost()}/reviews", [
+        'spec' => 'just some prose about an api', 'mode' => 'council',
+    ])->assertStatus(422)->assertJsonPath('errors.spec.0', fn($msg) => filled($msg));
 });
 
 it('accepts a workflows dimension and persists it', function () {
@@ -87,7 +101,7 @@ it('persists an error row when the panel cannot reach quorum', function () {
 });
 
 it('shows a review by id', function () {
-    $review = Review::factory()->create(['status' => 'complete', 'mode' => 'council']);
+    $review = Review::factory()->for($this->organization)->create(['status' => 'complete', 'mode' => 'council']);
 
     $this->getJson("https://{$this->apiHost()}/reviews/{$review->id}")
         ->assertOk()

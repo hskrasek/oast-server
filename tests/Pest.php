@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\Organization;
+use App\Models\OrganizationMembership;
+use App\Models\User;
 use App\Site\Publication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -44,6 +47,38 @@ expect()->extend('toBeOne', fn() => $this->toBe(1));
 | global functions to help you to reduce the number of lines of code in your test files.
 |
 */
+
+/** @return array{User, Organization, OrganizationMembership} */
+function memberFixture(string $role = 'member'): array
+{
+    $organization = Organization::factory()->create();
+    $user = User::factory()->create();
+    $membership = OrganizationMembership::factory()->for($organization)->for($user)->create(['role' => $role]);
+
+    return [$user, $organization, $membership];
+}
+
+/**
+ * Issue a valid organization-scoped bearer token for the given (or a fresh)
+ * member fixture so API feature tests can authenticate the bearer-only surface.
+ *
+ * @return array{User, Organization, string}
+ */
+function apiTokenFixture(): array
+{
+    [$user, $organization] = memberFixture();
+    $created = app(App\Tokens\PersonalAccessTokenService::class)->create($user, $organization, 'test', null);
+
+    return [$user, $organization, $created->plainTextToken];
+}
+
+function fixtureSpecPath(): string
+{
+    $path = sys_get_temp_dir() . '/oast-spec-' . uniqid() . '.yaml';
+    file_put_contents($path, 'openapi: 3.1.0');
+
+    return $path;
+}
 
 function orchestrator(array $configOverrides = []): App\Council\CouncilOrchestrator
 {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\Organization;
 use App\Models\Review;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Override;
@@ -22,6 +23,8 @@ final class ReviewFactory extends Factory
     public function definition(): array
     {
         return [
+            'organization_id' => Organization::factory(),
+            'created_by_user_id' => null,
             'spec_ref' => 'spec.yaml',
             'spec_hash' => hash('sha256', 'spec'),
             'spec' => 'openapi: 3.1.0',

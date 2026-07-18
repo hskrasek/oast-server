@@ -6,6 +6,8 @@ use App\Council\Exceptions\JudgeException;
 use App\Council\Exceptions\PanelException;
 use App\Http\Problems\ProblemResponse;
 use App\Http\Problems\ProblemType;
+use App\Reviews\ActiveReviewLimitExceeded;
+use App\Streaming\StreamLimitExceeded;
 use Crell\ApiProblem\ApiProblem;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -20,7 +22,6 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__ . '/../routes/web.php',
         api: __DIR__ . '/../routes/api.php',
         commands: __DIR__ . '/../routes/console.php',
-        health: '/up',
         apiPrefix: '',
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -36,6 +37,27 @@ return Application::configure(basePath: dirname(__DIR__))
             headers: Request::HEADER_X_FORWARDED_FOR
                 | Request::HEADER_X_FORWARDED_PROTO
                 | Request::HEADER_X_FORWARDED_PORT,
+        );
+
+        $middleware->append(App\Http\Middleware\CanonicalizeEmailInput::class);
+
+        $middleware->alias([
+            'installation' => App\Http\Middleware\EnsureInstallationBootstrapped::class,
+            'verified.configured' => App\Http\Middleware\EnsureEmailIsVerifiedWhenConfigured::class,
+            'organization' => App\Http\Middleware\EnsureOrganizationMembership::class,
+            // Laravel 13 and Sanctum 4.3 do not register these aliases automatically.
+            'ability' => Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
+            'abilities' => Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+        ]);
+
+        // Fortify's auth-protected entry points (email/verify, user/confirm-password)
+        // also carry EnsureInstallationBootstrapped via fortify.middleware. It must
+        // outrank Authenticate so a pre-bootstrap request lands on /setup rather than
+        // /login. The priority list slots Authenticate via the AuthenticatesRequests
+        // contract it implements, so prepend ours just ahead of that contract.
+        $middleware->prependToPriorityList(
+            before: Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: App\Http\Middleware\EnsureInstallationBootstrapped::class,
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -76,6 +98,61 @@ return Application::configure(basePath: dirname(__DIR__))
             $problem['errors'] = $e->errors;
 
             return ProblemResponse::from($problem, 502);
+        });
+
+        $exceptions->render(function (Illuminate\Auth\AuthenticationException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            return ProblemResponse::from(new ApiProblem('Unauthenticated', ProblemType::Unauthenticated->value)->setDetail('A valid bearer token is required.'), 401, ['WWW-Authenticate' => 'Bearer']);
+        });
+
+        $exceptions->render(function (Illuminate\Auth\Access\AuthorizationException|Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            return ProblemResponse::from(new ApiProblem('Forbidden', ProblemType::Forbidden->value)->setDetail('The credential cannot perform this action.'), 403);
+        });
+
+        $exceptions->render(function (Illuminate\Http\Exceptions\ThrottleRequestsException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $retryAfter = $e->getHeaders()['Retry-After'] ?? '60';
+            $retry = is_scalar($retryAfter) ? (string) $retryAfter : '60';
+
+            return ProblemResponse::from(new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many requests.'), 429, ['Retry-After' => $retry]);
+        });
+
+        $exceptions->render(function (ActiveReviewLimitExceeded $e, Request $request) use ($onApi): Response {
+            $headers = ['Retry-After' => (string) $e->retryAfter];
+
+            if (! $onApi($request)) {
+                return response('Too many active reviews.', 429, $headers);
+            }
+
+            return ProblemResponse::from(
+                new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many active reviews.'),
+                429,
+                $headers,
+            );
+        });
+
+        $exceptions->render(function (StreamLimitExceeded $e, Request $request) use ($onApi): Response {
+            $headers = ['Retry-After' => (string) $e->retryAfter];
+
+            if (! $onApi($request)) {
+                return response('', 429, $headers);
+            }
+
+            return ProblemResponse::from(
+                new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many concurrent event streams.'),
+                429,
+                $headers,
+            );
         });
 
         $exceptions->render(function (NotFoundHttpException $e, Request $request) use ($onApi): ?Response {

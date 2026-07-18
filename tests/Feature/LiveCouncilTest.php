@@ -20,7 +20,8 @@ it('runs a real council review against OpenRouter', function (): void {
 
     // QUEUE_CONNECTION=sync in the test environment runs the panel batch and
     // judge job inline, so the review is already terminal once this returns.
-    $review = app(CreateReviewAction::class)($spec, ReviewMode::Council);
+    [$user, $organization] = memberFixture();
+    $review = app(CreateReviewAction::class)($spec, ReviewMode::Council, $organization, $user);
 
     expect($review->refresh()->status)->toBe('complete')
         ->and($review->findings)->not->toBeEmpty();

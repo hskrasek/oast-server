@@ -1,5 +1,3 @@
-# Dockerfile
-# --- assets: build Tailwind/Vite bundle with Bun + Vite Plus ---
 FROM oven/bun:1 AS assets
 WORKDIR /build
 COPY package.json bun.lock .npmrc vite.config.js ./
@@ -7,7 +5,6 @@ RUN bun install --frozen-lockfile
 COPY resources ./resources
 RUN bun run build
 
-# --- vendor: production composer deps ---
 FROM composer:2 AS vendor
 WORKDIR /build
 COPY composer.json composer.lock ./
@@ -15,24 +12,37 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist --no-in
 COPY . .
 RUN composer dump-autoload --optimize --no-dev
 
-# --- runtime ---
 FROM dunglas/frankenphp:1-php8.5 AS runtime
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends supervisor curl \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=vendor /build /app
 COPY --from=assets /build/public/build /app/public/build
-RUN php artisan config:clear \
- && mkdir -p storage/framework/{cache,sessions,views} \
- && chown -R www-data:www-data storage bootstrap/cache
-ENV SERVER_NAME=:8080
-# Stateless runtime defaults: no local DB/queue/session state, logs to stderr for
-# CloudWatch. Nothing in this image writes anything that needs to survive a restart.
-# Deployment envs (ECS task def) may still override any of these.
-ENV LOG_CHANNEL=stderr
-ENV SESSION_DRIVER=cookie
-ENV CACHE_STORE=file
-ENV QUEUE_CONNECTION=sync
-ENV DB_CONNECTION=sqlite
-ENV DB_DATABASE=/tmp/database.sqlite
+COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
+COPY docker/entrypoint.sh /usr/local/bin/oast-entrypoint
+COPY docker/validate-app-key /usr/local/bin/validate-app-key
+COPY docker/oast-worker-health /usr/local/bin/oast-worker-health
+RUN chmod 0755 /usr/local/bin/oast-entrypoint /usr/local/bin/validate-app-key /usr/local/bin/oast-worker-health \
+ && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache /var/lib/oast/publications \
+ && chown -R www-data:www-data storage bootstrap/cache /var/lib/oast
+ENV APP_ENV=production \
+    APP_DEBUG=false \
+    LOG_CHANNEL=stderr \
+    DB_CONNECTION=sqlite \
+    DB_DATABASE=/var/lib/oast/database.sqlite \
+    DB_JOURNAL_MODE=WAL \
+    DB_BUSY_TIMEOUT=5000 \
+    DB_TRANSACTION_MODE=IMMEDIATE \
+    DB_QUEUE_RETRY_AFTER=960 \
+    SESSION_DRIVER=database \
+    CACHE_STORE=database \
+    QUEUE_CONNECTION=database \
+    SITE_PUBLICATIONS_PATH=/var/lib/oast/publications \
+    OAST_QUEUE_WORKERS=1 \
+    SERVER_NAME=:8080
+VOLUME ["/var/lib/oast"]
 EXPOSE 8080
-USER www-data
-ENTRYPOINT ["frankenphp", "php-server", "--root", "/app/public", "--listen", ":8080"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 CMD curl --fail --silent http://127.0.0.1:8080/up >/dev/null && /usr/local/bin/oast-worker-health
+ENTRYPOINT ["/usr/local/bin/oast-entrypoint"]

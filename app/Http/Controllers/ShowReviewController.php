@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Http\Resources\ReviewResource;
-use App\Models\Review;
+use App\Reviews\ScopedReviewResolver;
+use Illuminate\Support\Facades\Gate;
 
 final class ShowReviewController
 {
-    public function __invoke(Review $review): ReviewResource
+    public function __invoke(string $review, ScopedReviewResolver $resolver): ReviewResource
     {
-        return new ReviewResource($review);
+        $model = $resolver->findOrFail($review);
+        Gate::authorize('view', $model);
+
+        return new ReviewResource($model);
     }
 }

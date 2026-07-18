@@ -6,6 +6,12 @@ namespace App\Providers;
 
 use App\Council\CouncilOrchestrator;
 use App\Council\FindingValidator;
+use App\Identity\RegistrationPolicy;
+use App\Identity\SelfHostedRegistrationPolicy;
+use App\Listeners\TouchPersonalAccessTokenLastUsed;
+use App\Models\OrganizationMembership;
+use App\Models\PersonalAccessToken;
+use App\Organizations\OrganizationContext;
 use App\Site\Newsletter\NewsletterContacts;
 use App\Site\Newsletter\SesNewsletterContacts;
 use App\Site\Og\CloudflareOgImageRenderer;
@@ -14,8 +20,11 @@ use Aws\SesV2\SesV2Client;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Container\Container;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Events\TokenAuthenticated;
+use Laravel\Sanctum\Sanctum;
 
 final class AppServiceProvider extends ServiceProvider
 {
@@ -47,6 +56,10 @@ final class AppServiceProvider extends ServiceProvider
                 config()->string('services.cloudflare.browser_token'),
             ),
         );
+
+        $this->app->scoped(OrganizationContext::class);
+
+        $this->app->bind(RegistrationPolicy::class, SelfHostedRegistrationPolicy::class);
     }
 
     /**
@@ -63,6 +76,13 @@ final class AppServiceProvider extends ServiceProvider
             fn(Request $request): Limit => Limit::perMinute(5)
                 ->by('subscribe:' . ($request->header('CF-Connecting-IP') ?? $request->ip())),
         );
+
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+        Sanctum::authenticateAccessTokensUsing(fn(PersonalAccessToken $token, bool $valid): bool => $valid && $token->revoked_at === null
+            && ($token->expires_at === null || $token->expires_at->isFuture())
+            && OrganizationMembership::query()->where('user_id', $token->tokenable_id)
+                ->where('organization_id', $token->organization_id)->exists());
+        Event::listen(TokenAuthenticated::class, TouchPersonalAccessTokenLastUsed::class);
     }
 
     /**
