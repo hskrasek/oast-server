@@ -44,6 +44,17 @@ it('returns a problem+json validation error when spec is missing', function () {
         ->assertJsonPath('errors.spec.0', fn($msg) => filled($msg));
 });
 
+it('rejects an oversized or unparseable spec as problem+json validation', function () {
+    config()->set('oast.max_spec_bytes', 32);
+    $this->postJson("https://{$this->apiHost()}/reviews", [
+        'spec' => str_repeat('a: b', 20), 'mode' => 'council',
+    ])->assertStatus(422)->assertJsonPath('errors.spec.0', fn($msg) => filled($msg));
+
+    $this->postJson("https://{$this->apiHost()}/reviews", [
+        'spec' => 'just some prose about an api', 'mode' => 'council',
+    ])->assertStatus(422)->assertJsonPath('errors.spec.0', fn($msg) => filled($msg));
+});
+
 it('accepts a workflows dimension and persists it', function () {
     fakeCouncil();
 

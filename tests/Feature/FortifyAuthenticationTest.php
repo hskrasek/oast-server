@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Models\Installation;
 use App\Models\User;
+use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
@@ -46,6 +48,40 @@ it('canonicalizes password reset lookup and resets with confirmed rules', functi
         return true;
     });
     expect(Hash::check('new correct horse battery staple', $user->refresh()->password))->toBeTrue();
+});
+
+it('rehashes an outdated password hash on login', function (): void {
+    // Any cost differing from the configured BCRYPT_ROUNDS (4 in phpunit.xml) needs rehash;
+    // written via query builder because the hashed cast rejects off-configuration hashes.
+    $stale = password_hash('correct horse battery staple', PASSWORD_BCRYPT, ['cost' => 5]);
+    $user = User::factory()->create();
+    User::query()->whereKey($user->id)->update(['password' => $stale]);
+
+    $this->post('/login', ['email' => $user->email, 'password' => 'correct horse battery staple'])->assertRedirect('/');
+
+    $fresh = $user->refresh()->password;
+    expect($fresh)->not->toBe($stale)
+        ->and(Hash::check('correct horse battery staple', $fresh))->toBeTrue();
+});
+
+it('fires the failed authentication event on a wrong password', function (): void {
+    Event::fake([Failed::class]);
+    User::factory()->create(['email' => 'owner@example.test', 'password' => 'correct horse battery staple']);
+
+    $this->from('/login')->post('/login', ['email' => 'owner@example.test', 'password' => 'wrong']);
+
+    Event::assertDispatched(Failed::class);
+});
+
+it('throttles the sixth login attempt for the same email and ip', function (): void {
+    User::factory()->create(['email' => 'owner@example.test', 'password' => 'correct horse battery staple']);
+    foreach (range(1, 5) as $i) {
+        $this->from('/login')->post('/login', ['email' => 'owner@example.test', 'password' => 'wrong'])
+            ->assertSessionHasErrors('email');
+    }
+
+    $this->from('/login')->post('/login', ['email' => 'owner@example.test', 'password' => 'wrong'])
+        ->assertTooManyRequests();
 });
 
 it('serves verification and password confirmation views', function (): void {

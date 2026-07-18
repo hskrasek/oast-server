@@ -25,7 +25,7 @@ final class StreamLeaseManager
             return $leases;
         });
 
-        return new StreamLease($this, $principal, $id);
+        return new StreamLease($this, $principal, $id, intdiv(self::TTL_SECONDS, 3));
     }
 
     public function refresh(string $principal, string $id): void

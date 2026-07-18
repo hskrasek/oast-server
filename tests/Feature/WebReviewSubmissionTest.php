@@ -71,3 +71,17 @@ it('rejects absent simultaneous and oversized sources', function (): void {
         'mode' => 'council', 'dimension' => 'domain-modeling',
     ])->assertSessionHasErrors('spec_file');
 });
+
+it('rejects pasted and uploaded content that is not a yaml or json document', function (): void {
+    [$user] = memberFixture();
+
+    $this->actingAs($user)->post('/app/reviews', [
+        'spec' => 'just some prose about an api',
+        'mode' => 'council', 'dimension' => 'domain-modeling',
+    ])->assertSessionHasErrors('spec');
+    $this->actingAs($user)->post('/app/reviews', [
+        'spec_file' => UploadedFile::fake()->createWithContent('spec.yaml', "\x89PNG\r\n binary junk"),
+        'mode' => 'council', 'dimension' => 'domain-modeling',
+    ])->assertSessionHasErrors('spec_file');
+    expect(Review::query()->count())->toBe(0);
+});

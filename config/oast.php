@@ -33,5 +33,7 @@ return [
     'enforce_email_verification' => (bool) env('OAST_ENFORCE_EMAIL_VERIFICATION', false),
     'invitation_ttl_hours' => (int) env('OAST_INVITATION_TTL_HOURS', 72),
     'max_active_reviews' => (int) env('OAST_MAX_ACTIVE_REVIEWS', 10),
+    // Matches the 5 MB web upload cap (spec_file max:5120).
+    'max_spec_bytes' => (int) env('OAST_MAX_SPEC_BYTES', 5 * 1024 * 1024),
     'max_concurrent_streams' => (int) env('OAST_MAX_CONCURRENT_STREAMS', 5),
 ];

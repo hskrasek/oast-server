@@ -23,6 +23,12 @@ final class ReviewPolicy
 
     public function delete(User $user, Review $review): bool
     {
+        // Jobs load the review by id mid-run; deleting a non-terminal review
+        // would fail the batch after paid LLM calls have already been made.
+        if (! in_array($review->status, ['complete', 'error'], true)) {
+            return false;
+        }
+
         return $review->created_by_user_id === $user->id || OrganizationMembership::query()->where('user_id', $user->id)->where('organization_id', $review->organization_id)->where('role', OrganizationRole::Owner)->exists();
     }
 }

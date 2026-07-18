@@ -8,18 +8,31 @@ final class StreamLease
 {
     private bool $released = false;
 
-    public function __construct(private readonly StreamLeaseManager $manager, private readonly string $principal, private readonly string $leaseId) {}
+    private int $refreshedAt;
+
+    public function __construct(private readonly StreamLeaseManager $manager, private readonly string $principal, private readonly string $leaseId, private readonly int $refreshAfterSeconds)
+    {
+        $this->refreshedAt = now()->getTimestamp();
+    }
 
     public function id(): string
     {
         return $this->leaseId;
     }
 
+    /**
+     * Callers may invoke this on a tight loop (the SSE tick); the write is
+     * skipped until refreshAfterSeconds has elapsed so a lease costs a
+     * couple of cache writes per TTL, not two per second.
+     */
     public function refresh(): void
     {
-        if (! $this->released) {
-            $this->manager->refresh($this->principal, $this->leaseId);
+        if ($this->released || now()->getTimestamp() - $this->refreshedAt < $this->refreshAfterSeconds) {
+            return;
         }
+
+        $this->refreshedAt = now()->getTimestamp();
+        $this->manager->refresh($this->principal, $this->leaseId);
     }
 
     public function release(): void

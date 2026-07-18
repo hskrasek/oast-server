@@ -32,6 +32,27 @@ it('purges each abandoned lease by its own expiry even when another lease refres
     Carbon::setTestNow();
 });
 
+it('only persists a refresh once a third of the ttl has elapsed', function (): void {
+    Carbon::setTestNow('2026-07-11 00:00:00');
+    config(['oast.max_concurrent_streams' => 1]);
+    $manager = app(StreamLeaseManager::class);
+
+    // An early refresh is a no-op: expiry stays at acquire + 900s.
+    $early = $manager->acquire('user:9');
+    Carbon::setTestNow(now()->addSeconds(100));
+    $early->refresh();
+    Carbon::setTestNow(now()->addSeconds(850));
+    expect($manager->acquire('user:9'))->toBeInstanceOf(App\Streaming\StreamLease::class);
+
+    // A refresh past TTL/3 persists: expiry moves to refresh + 900s.
+    $late = $manager->acquire('user:10');
+    Carbon::setTestNow(now()->addSeconds(400));
+    $late->refresh();
+    Carbon::setTestNow(now()->addSeconds(800));
+    expect(fn() => $manager->acquire('user:10'))->toThrow(StreamLimitExceeded::class);
+    Carbon::setTestNow();
+});
+
 it('keeps token and browser principals separate', function (): void {
     config(['oast.max_concurrent_streams' => 1]);
     $manager = app(StreamLeaseManager::class);
