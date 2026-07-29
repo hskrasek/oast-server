@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\InvitationAcceptanceController;
+use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\Site\ConfirmSubscriptionController;
 use App\Http\Controllers\Site\HomeController;
 use App\Http\Controllers\Site\OgImageController;
@@ -52,6 +54,11 @@ Route::get('/subscribe/confirm/{email}', ConfirmSubscriptionController::class)
 Route::get('/setup', [SetupController::class, 'show'])->name('setup.show');
 Route::post('/setup/authorize', SetupAuthorizationController::class)->middleware('throttle:5,1')->name('setup.authorize');
 Route::post('/setup', [SetupController::class, 'store'])->middleware('throttle:5,1')->name('setup.store');
+
+Route::get('/invitations/{token}', [InvitationController::class, 'show'])->where('token', '[a-f0-9]{64}')->middleware(['installation', 'throttle:30,1'])->name('invitations.show');
+Route::post('/invitations/{token}/login', [InvitationController::class, 'startLogin'])->where('token', '[a-f0-9]{64}')->middleware(['installation', 'throttle:10,1'])->name('invitations.start-login');
+Route::post('/invitations/{token}/register', [InvitationController::class, 'startRegistration'])->where('token', '[a-f0-9]{64}')->middleware(['installation', 'throttle:10,1'])->name('invitations.start-registration');
+Route::post('/invitations/{token}/accept', InvitationAcceptanceController::class)->where('token', '[a-f0-9]{64}')->middleware(['installation', 'auth', 'throttle:10,1'])->name('invitations.accept');
 Route::prefix('app')->name('app.')->middleware(['installation', 'auth', 'verified.configured', 'organization'])->group(function (): void {
     Route::view('/', 'app.home')->name('home');
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Actions\Identity\CreateNewUser;
 use App\Actions\Identity\ResetUserPassword;
 use App\Identity\CanonicalEmail;
 use App\Models\User;
@@ -22,6 +23,10 @@ final class FortifyServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Fortify::createUsersUsing(CreateNewUser::class);
+        Fortify::registerView(fn(Request $request) => view('auth.register', [
+            'token' => $request->session()->get('oast.invitation.token'),
+        ]));
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         /** @var view-string $login */
         $login = 'auth.login';
