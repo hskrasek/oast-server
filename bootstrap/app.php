@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Council\Exceptions\JudgeException;
 use App\Council\Exceptions\PanelException;
+use App\Http\Middleware\CanonicalizeEmailInput;
 use App\Http\Problems\ProblemResponse;
 use App\Http\Problems\ProblemType;
 use Crell\ApiProblem\ApiProblem;
@@ -37,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_PROTO
                 | Request::HEADER_X_FORWARDED_PORT,
         );
+        $middleware->append(CanonicalizeEmailInput::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Map domain/validation failures to RFC 9457 problem+json on the API host.
