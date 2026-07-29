@@ -58,6 +58,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Track Token Last Used At
+    |--------------------------------------------------------------------------
+    |
+    | This value determines if the last_used_at timestamp should be updated
+    | when a token is used to authenticate a request. Disabling this can
+    | improve performance if you don't need to track token usage.
+    |
+    */
+
+    'last_used_at' => false,
+
+    /*
+    |--------------------------------------------------------------------------
     | Token Prefix
     |--------------------------------------------------------------------------
     |
