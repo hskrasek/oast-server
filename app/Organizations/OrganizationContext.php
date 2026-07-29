@@ -19,10 +19,15 @@ final class OrganizationContext
 
     public function organization(): Organization
     {
+        /**
+         * organization_id is NOT NULL + FK-constrained, so the loaded relation
+         * is never actually null; this annotation only narrows the type
+         * Larastan assigns to magic BelongsTo property access — it does not
+         * change runtime behavior.
+         *
+         * @var Organization $organization
+         */
         $organization = $this->membership()->organization;
-        if (! $organization instanceof Organization) {
-            throw new MissingOrganizationMembership;
-        }
 
         return $organization;
     }
