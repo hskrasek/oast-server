@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\Organization;
+use App\Models\OrganizationMembership;
+use App\Models\User;
 use App\Site\Publication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -99,4 +102,14 @@ function ogPublicationFixture(array $overrides = []): Publication
         'reviewed_at' => '2026-07-05T00:00:00Z',
         'published_at' => '2026-07-05T00:00:00Z',
     ], $overrides));
+}
+
+/** @return array{User, Organization, OrganizationMembership} */
+function memberFixture(string $role = 'member'): array
+{
+    $organization = Organization::factory()->create();
+    $user = User::factory()->create();
+    $membership = OrganizationMembership::factory()->for($organization)->for($user)->create(['role' => $role]);
+
+    return [$user, $organization, $membership];
 }
