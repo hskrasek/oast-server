@@ -17,6 +17,9 @@ use Laravel\Fortify\Fortify;
 
 final class FortifyServiceProvider extends ServiceProvider
 {
+    // ponytail: pre-computed bcrypt hash for timing attack mitigation, constant literal is safe
+    private const string DUMMY_PASSWORD_HASH = '$2y$12$S9QoSzsS5SEKYzIVZvuBe.Z4xyHLjRMsJPjB1q8UkE3L5SBWyQsVG';
+
     public function boot(): void
     {
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
@@ -38,7 +41,9 @@ final class FortifyServiceProvider extends ServiceProvider
 
         Fortify::authenticateUsing(function (Request $request): User {
             $user = User::query()->where('email', CanonicalEmail::from($request->string('email')->value()))->first();
-            if (! $user instanceof User || ! Hash::check($request->string('password')->value(), $user->password)) {
+            $password = $request->string('password')->value();
+            $hash = $user instanceof User ? $user->password : self::DUMMY_PASSWORD_HASH;
+            if (! Hash::check($password, $hash) || ! $user instanceof User) {
                 throw ValidationException::withMessages(['email' => __('auth.failed')]);
             }
             return $user;
