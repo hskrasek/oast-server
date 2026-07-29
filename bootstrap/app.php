@@ -39,7 +39,13 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_PORT,
         );
         $middleware->append(CanonicalizeEmailInput::class);
-        $middleware->alias(['installation' => App\Http\Middleware\EnsureInstallationBootstrapped::class]);
+        $middleware->alias([
+            'installation' => App\Http\Middleware\EnsureInstallationBootstrapped::class,
+            'verified.configured' => App\Http\Middleware\EnsureEmailIsVerifiedWhenConfigured::class,
+            'organization' => App\Http\Middleware\EnsureOrganizationMembership::class,
+            'ability' => Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
+            'abilities' => Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+        ]);
         // Fortify's route group ends with SubstituteBindings (a late-priority
         // middleware), so our unprioritized gate would otherwise sort after
         // it — and Laravel's priority sort then hoists 'auth' to just before

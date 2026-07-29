@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Council\CouncilOrchestrator;
 use App\Council\FindingValidator;
+use App\Organizations\OrganizationContext;
 use App\Site\Newsletter\NewsletterContacts;
 use App\Site\Newsletter\SesNewsletterContacts;
 use App\Site\Og\CloudflareOgImageRenderer;
@@ -24,6 +25,8 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->scoped(OrganizationContext::class);
+
         $this->app->singleton(
             CouncilOrchestrator::class,
             fn(Container $app): CouncilOrchestrator => new CouncilOrchestrator(
