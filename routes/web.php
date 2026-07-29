@@ -8,6 +8,8 @@ use App\Http\Controllers\Site\OgImageController;
 use App\Http\Controllers\Site\ReviewIndexController;
 use App\Http\Controllers\Site\ReviewShowController;
 use App\Http\Controllers\Site\SubscribeController;
+use App\Http\Controllers\SetupAuthorizationController;
+use App\Http\Controllers\SetupController;
 use App\Site\Og\OgTemplate;
 use Illuminate\Support\Facades\Route;
 
@@ -46,3 +48,10 @@ Route::post('/subscribe', SubscribeController::class)
     ->middleware('throttle:subscribe')->name('subscribe');
 Route::get('/subscribe/confirm/{email}', ConfirmSubscriptionController::class)
     ->middleware('signed')->name('subscribe.confirm');
+
+Route::get('/setup', [SetupController::class, 'show'])->name('setup.show');
+Route::post('/setup/authorize', SetupAuthorizationController::class)->middleware('throttle:5,1')->name('setup.authorize');
+Route::post('/setup', [SetupController::class, 'store'])->middleware('throttle:5,1')->name('setup.store');
+Route::prefix('app')->name('app.')->middleware(['installation', 'auth'])->group(function (): void {
+    Route::view('/', 'app.home')->name('home');
+});

@@ -39,6 +39,16 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_PORT,
         );
         $middleware->append(CanonicalizeEmailInput::class);
+        $middleware->alias(['installation' => App\Http\Middleware\EnsureInstallationBootstrapped::class]);
+        // Fortify's route group ends with SubstituteBindings (a late-priority
+        // middleware), so our unprioritized gate would otherwise sort after
+        // it — and Laravel's priority sort then hoists 'auth' to just before
+        // SubstituteBindings, ahead of our gate too. Giving the gate an
+        // explicit priority before Authenticate keeps it first regardless.
+        $middleware->prependToPriorityList(
+            before: Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: App\Http\Middleware\EnsureInstallationBootstrapped::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Map domain/validation failures to RFC 9457 problem+json on the API host.

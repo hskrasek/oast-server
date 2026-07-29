@@ -31,4 +31,10 @@ return [
 
     // Seconds to wait for a straggling panelist after quorum before the judge starts.
     'quorum_grace' => (int) env('OAST_QUORUM_GRACE', 60),
+
+    'bootstrap_secret' => env('OAST_BOOTSTRAP_SECRET'),
+    'enforce_email_verification' => (bool) env('OAST_ENFORCE_EMAIL_VERIFICATION', false),
+    'invitation_ttl_hours' => (int) env('OAST_INVITATION_TTL_HOURS', 72),
+    'max_active_reviews' => (int) env('OAST_MAX_ACTIVE_REVIEWS', 10),
+    'max_concurrent_streams' => (int) env('OAST_MAX_CONCURRENT_STREAMS', 5),
 ];
