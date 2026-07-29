@@ -10,6 +10,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $expires_at
+ * @property \Illuminate\Support\Carbon|null $accepted_at
+ * @property \Illuminate\Support\Carbon|null $revoked_at
+ */
 final class OrganizationInvitation extends Model
 {
     /** @use HasFactory<OrganizationInvitationFactory> */
@@ -22,7 +27,7 @@ final class OrganizationInvitation extends Model
 
     public function available(): bool
     {
-        return $this->accepted_at === null && $this->revoked_at === null && $this->expires_at->isFuture();
+        return $this->accepted_at === null && $this->revoked_at === null && ($this->expires_at?->isFuture() ?? false);
     }
 
     /** @return BelongsTo<Organization, $this> */

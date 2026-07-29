@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use LogicException;
+use Stringable;
 
 final class PersonalAccessToken extends SanctumPersonalAccessToken
 {
@@ -32,7 +33,7 @@ final class PersonalAccessToken extends SanctumPersonalAccessToken
         });
     }
 
-    /** @return array<string, string> */
+    /** @return array<string, string|Stringable> */
     protected function casts(): array
     {
         return [...parent::casts(), 'revoked_at' => 'datetime'];

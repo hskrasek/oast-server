@@ -28,3 +28,11 @@ it('enforces one membership per user', function (): void {
     expect(fn() => OrganizationMembership::factory()->for($user)->create())
         ->toThrow(Illuminate\Database\QueryException::class);
 });
+
+it('resolves review relationships correctly', function (): void {
+    $user = App\Models\User::factory()->create();
+    $review = App\Models\Review::factory()->for($user, 'creator')->create();
+
+    expect($review->organization()->sole()->is($review->organization))->toBeTrue()
+        ->and($review->creator()->sole()->is($user))->toBeTrue();
+});
