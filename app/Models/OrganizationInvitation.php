@@ -9,6 +9,7 @@ use Database\Factories\OrganizationInvitationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Override;
 
 /**
  * @property \Illuminate\Support\Carbon|null $expires_at
@@ -20,6 +21,7 @@ final class OrganizationInvitation extends Model
     /** @use HasFactory<OrganizationInvitationFactory> */
     use HasFactory;
 
+    #[Override]
     protected $fillable = [
         'organization_id', 'invited_by_user_id', 'email', 'role', 'token_hash',
         'expires_at', 'accepted_at', 'revoked_at',

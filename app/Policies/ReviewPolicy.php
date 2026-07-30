@@ -15,10 +15,12 @@ final class ReviewPolicy
     {
         return OrganizationMembership::query()->where('user_id', $user->id)->where('organization_id', $review->organization_id)->exists();
     }
+
     public function follow(User $user, Review $review): bool
     {
         return $this->view($user, $review);
     }
+
     public function delete(User $user, Review $review): bool
     {
         return $review->created_by_user_id === $user->id || OrganizationMembership::query()->where('user_id', $user->id)->where('organization_id', $review->organization_id)->where('role', OrganizationRole::Owner)->exists();

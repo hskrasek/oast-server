@@ -22,6 +22,7 @@ final class TokenSettingsController
         if (! $user instanceof User) {
             abort(403);
         }
+
         $plain = $request->session()->pull('oast.new_token');
         $response = response()->view('app.settings.tokens', [
             'tokens' => $user->tokens()->where('organization_id', $context->organization()->id)->latest()->get(),
@@ -38,6 +39,7 @@ final class TokenSettingsController
         if (! $user instanceof User) {
             abort(403);
         }
+
         $expires = $request->filled('expires_at') ? CarbonImmutable::parse($request->string('expires_at')->value()) : null;
         $created = $service->create($user, $context->organization(), $request->string('name')->value(), $expires);
 
@@ -50,6 +52,7 @@ final class TokenSettingsController
         if (! $user instanceof User) {
             abort(403);
         }
+
         abort_unless($token->tokenable_id === $user->id && $token->organization_id === $context->organization()->id, 404);
         $service->revoke($token);
 

@@ -143,8 +143,9 @@ return Application::configure(basePath: dirname(__DIR__))
             if (! $onApi($request)) {
                 return response('Too many active reviews.', 429, $headers);
             }
+
             return ProblemResponse::from(
-                (new ApiProblem('Rate limited', ProblemType::RateLimited->value))->setDetail('Too many active reviews.'),
+                new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many active reviews.'),
                 429,
                 $headers,
             );
@@ -157,7 +158,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return ProblemResponse::from(
-                (new ApiProblem('Rate limited', ProblemType::RateLimited->value))->setDetail('Too many concurrent event streams.'),
+                new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many concurrent event streams.'),
                 429,
                 $headers,
             );

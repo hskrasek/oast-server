@@ -36,6 +36,7 @@ final class InvitationService
             Mail::to($email)->send(new OrganizationInvitationMail($url));
         } catch (Throwable) {
         }
+
         return ['invitation' => $invitation, 'url' => $url];
     }
 
@@ -46,6 +47,7 @@ final class InvitationService
             if ($locked->accepted_at !== null || $locked->revoked_at !== null) {
                 throw ValidationException::withMessages(['invitation' => 'This invitation is not available.']);
             }
+
             $locked->update(['revoked_at' => now()]);
         }, 3);
     }

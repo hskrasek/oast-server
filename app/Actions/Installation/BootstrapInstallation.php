@@ -23,6 +23,7 @@ final class BootstrapInstallation
             if ($installation->bootstrapped_at !== null) {
                 throw new NotFoundHttpException;
             }
+
             $user = User::query()->create([
                 'name' => $data->name, 'email' => $data->email,
                 'password' => Hash::make($data->password), 'email_verified_at' => now(),

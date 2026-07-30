@@ -19,6 +19,7 @@ final class OwnershipTransferController
         if (! $user instanceof User) {
             abort(403);
         }
+
         $service->transferOwnership($user, $target);
 
         return back();

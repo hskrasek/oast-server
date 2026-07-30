@@ -28,25 +28,25 @@ final class FortifyServiceProvider extends ServiceProvider
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
-        Fortify::registerView(fn(Request $request) => view('auth.register', [
+        Fortify::registerView(fn(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View => view('auth.register', [
             'token' => $request->session()->get('oast.invitation.token'),
         ]));
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         /** @var view-string $login */
         $login = 'auth.login';
-        Fortify::loginView(fn() => view($login));
+        Fortify::loginView(fn(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View => view($login));
         /** @var view-string $forgotPassword */
         $forgotPassword = 'auth.forgot-password';
-        Fortify::requestPasswordResetLinkView(fn() => view($forgotPassword));
+        Fortify::requestPasswordResetLinkView(fn(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View => view($forgotPassword));
         /** @var view-string $resetPassword */
         $resetPassword = 'auth.reset-password';
-        Fortify::resetPasswordView(fn(Request $request) => view($resetPassword, ['request' => $request]));
+        Fortify::resetPasswordView(fn(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View => view($resetPassword, ['request' => $request]));
         /** @var view-string $verifyEmail */
         $verifyEmail = 'auth.verify-email';
-        Fortify::verifyEmailView(fn() => view($verifyEmail));
+        Fortify::verifyEmailView(fn(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View => view($verifyEmail));
         /** @var view-string $confirmPassword */
         $confirmPassword = 'auth.confirm-password';
-        Fortify::confirmPasswordView(fn() => view($confirmPassword));
+        Fortify::confirmPasswordView(fn(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View => view($confirmPassword));
 
         Fortify::authenticateUsing(function (Request $request): User {
             $user = User::query()->where('email', CanonicalEmail::from($request->string('email')->value()))->first();
@@ -55,6 +55,7 @@ final class FortifyServiceProvider extends ServiceProvider
             if (! Hash::check($password, $hash) || ! $user instanceof User) {
                 throw ValidationException::withMessages(['email' => __('auth.failed')]);
             }
+
             return $user;
         });
 

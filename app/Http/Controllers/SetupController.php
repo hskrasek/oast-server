@@ -21,9 +21,11 @@ final class SetupController
         if (Installation::query()->findOrFail(1)->bootstrapped_at !== null) {
             throw new NotFoundHttpException;
         }
+
         if ($request->session()->get('oast.setup.authorized') === true) {
             return view('setup.create');
         }
+
         return view('setup.authorize');
     }
 

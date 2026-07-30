@@ -17,6 +17,7 @@ final class AccountPasswordController
         if (! $user instanceof User) {
             abort(403);
         }
+
         // Deviation from the task-8 brief (necessary fix): UpdateAccountPasswordRequest::rules()
         // only declares current_password/password, so $request->validated() strips
         // password_confirmation before UpdateUserPassword re-validates the 'confirmed' rule,

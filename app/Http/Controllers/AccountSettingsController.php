@@ -29,6 +29,7 @@ final class AccountSettingsController
         if (! $user instanceof User) {
             abort(403);
         }
+
         // Deviation from the task-8 brief (necessary for PHPStan level max):
         // UpdateUserProfileInformation::update() declares `@param array<string, string> $input`
         // (matching the sibling ResetUserPassword/CreateNewUser actions), but

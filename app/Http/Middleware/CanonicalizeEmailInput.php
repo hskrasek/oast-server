@@ -16,6 +16,7 @@ final class CanonicalizeEmailInput
         if (is_string($request->input('email'))) {
             $request->merge(['email' => CanonicalEmail::from($request->input('email'))]);
         }
+
         /** @var Response $response */
         $response = $next($request);
         return $response;

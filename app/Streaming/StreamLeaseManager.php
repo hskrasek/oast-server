@@ -25,6 +25,7 @@ final class StreamLeaseManager
                 if (count($leases) >= config()->integer('oast.max_concurrent_streams')) {
                     throw new StreamLimitExceeded(60);
                 }
+
                 $leases[$id] = now()->addSeconds(self::TTL_SECONDS)->getTimestamp();
 
                 return $leases;

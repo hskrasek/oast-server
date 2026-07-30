@@ -30,6 +30,7 @@ final class InvitationAcceptanceService
                 || OrganizationMembership::query()->where('user_id', $user->id)->exists()) {
                 throw ValidationException::withMessages(['invitation' => 'This invitation is not available.']);
             }
+
             OrganizationMembership::query()->create(['organization_id' => $locked->organization_id, 'user_id' => $user->id, 'role' => $locked->role]);
             $locked->update(['accepted_at' => now()]);
         }, 3);
@@ -41,6 +42,7 @@ final class InvitationAcceptanceService
             if (! hash_equals($invitation->email, CanonicalEmail::from($data->email))) {
                 throw ValidationException::withMessages(['invitation' => 'This invitation is not available.']);
             }
+
             $user = User::query()->create(['name' => $data->name, 'email' => CanonicalEmail::from($data->email), 'password' => Hash::make($data->password)]);
             $this->accept($invitation, $user);
             return $user;

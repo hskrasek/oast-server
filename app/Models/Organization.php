@@ -9,12 +9,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Override;
 
 final class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
     use HasFactory;
 
+    #[Override]
     protected $fillable = ['name'];
 
     /** @return HasMany<OrganizationMembership, $this> */

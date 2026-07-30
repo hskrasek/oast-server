@@ -10,12 +10,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use LogicException;
 use Stringable;
+use Override;
 
 final class PersonalAccessToken extends SanctumPersonalAccessToken
 {
     /** @use HasFactory<PersonalAccessTokenFactory> */
     use HasFactory;
 
+    #[Override]
     protected $fillable = ['organization_id', 'name', 'token', 'abilities', 'expires_at', 'revoked_at', 'last_used_at'];
 
     /** @return BelongsTo<Organization, $this> */

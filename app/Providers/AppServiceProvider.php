@@ -78,12 +78,10 @@ final class AppServiceProvider extends ServiceProvider
         );
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
-        Sanctum::authenticateAccessTokensUsing(function (PersonalAccessToken $token, bool $valid): bool {
-            return $valid && $token->revoked_at === null
-                && ($token->expires_at === null || $token->expires_at->isFuture())
-                && OrganizationMembership::query()->where('user_id', $token->tokenable_id)
-                    ->where('organization_id', $token->organization_id)->exists();
-        });
+        Sanctum::authenticateAccessTokensUsing(fn(PersonalAccessToken $token, bool $valid): bool => $valid && $token->revoked_at === null
+            && ($token->expires_at === null || $token->expires_at->isFuture())
+            && OrganizationMembership::query()->where('user_id', $token->tokenable_id)
+                ->where('organization_id', $token->organization_id)->exists());
         Event::listen(TokenAuthenticated::class, TouchPersonalAccessTokenLastUsed::class);
     }
 

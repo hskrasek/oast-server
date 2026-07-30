@@ -22,6 +22,7 @@ final class OrganizationInvitationController
         if (! $user instanceof User) {
             abort(403);
         }
+
         $result = $service->createOrReplace($organization, $user, $request->string('email')->value());
 
         return back()->with('invitation_url', $result['url']);

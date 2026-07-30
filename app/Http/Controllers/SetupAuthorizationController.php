@@ -17,10 +17,12 @@ final class SetupAuthorizationController
         if (Installation::query()->findOrFail(1)->bootstrapped_at !== null) {
             throw new NotFoundHttpException;
         }
+
         $configured = config('oast.bootstrap_secret');
         if (! is_string($configured) || $configured === '' || ! hash_equals($configured, $request->string('bootstrap_secret')->value())) {
             throw ValidationException::withMessages(['bootstrap_secret' => 'The bootstrap secret is invalid.']);
         }
+
         $request->session()->regenerateToken();
         $request->session()->put('oast.setup.authorized', true);
         return redirect()->route('setup.show');

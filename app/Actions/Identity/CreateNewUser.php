@@ -8,6 +8,7 @@ use App\Identity\CanonicalEmail;
 use App\Identity\PasswordRules;
 use App\Identity\RegistrationData;
 use App\Identity\RegistrationPolicy;
+use App\Models\OrganizationInvitation;
 use App\Models\User;
 use App\Organizations\InvitationAcceptanceService;
 use Illuminate\Support\Facades\Validator;
@@ -26,9 +27,10 @@ final readonly class CreateNewUser implements CreatesNewUsers
             'password' => PasswordRules::confirmed(), 'invitation_token' => ['required', 'string', 'size:64'],
         ])->validate();
         $invitation = $this->invitations->find($input['invitation_token']);
-        if ($invitation === null || ! $invitation->available()) {
+        if (!$invitation instanceof OrganizationInvitation || ! $invitation->available()) {
             throw ValidationException::withMessages(['invitation' => 'This invitation is not available.']);
         }
+
         $user = $this->policy->register(new RegistrationData($input['name'], CanonicalEmail::from($input['email']), $input['password']), $invitation);
         request()->session()->forget(['oast.invitation.token', 'url.intended']);
         return $user;

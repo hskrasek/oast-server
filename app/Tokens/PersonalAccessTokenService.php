@@ -25,7 +25,7 @@ final class PersonalAccessTokenService
         ]);
         assert($token instanceof PersonalAccessToken);
 
-        return new NewAccessToken($token, $token->id.'|'.$plain);
+        return new NewAccessToken($token, $token->id . '|' . $plain);
     }
 
     public function revoke(PersonalAccessToken $token): void

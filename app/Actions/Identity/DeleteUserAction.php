@@ -26,6 +26,7 @@ final class DeleteUserAction
                     throw ValidationException::withMessages(['user' => 'Transfer ownership before deleting this user.']);
                 }
             }
+
             $user->delete();
         }, 3);
     }

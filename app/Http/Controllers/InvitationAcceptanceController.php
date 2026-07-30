@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\OrganizationInvitation;
 use App\Models\User;
 use App\Organizations\InvitationAcceptanceService;
 use Illuminate\Http\RedirectResponse;
@@ -18,9 +19,10 @@ final readonly class InvitationAcceptanceController
     {
         $invitation = $this->acceptance->find($token);
         $user = $request->user();
-        if ($invitation === null || ! $user instanceof User) {
+        if (!$invitation instanceof OrganizationInvitation || ! $user instanceof User) {
             throw ValidationException::withMessages(['invitation' => 'This invitation is not available.']);
         }
+
         $this->acceptance->accept($invitation, $user);
         $request->session()->forget(['oast.invitation.token', 'url.intended']);
         return redirect()->route('app.home');

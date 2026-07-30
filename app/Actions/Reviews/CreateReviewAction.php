@@ -34,6 +34,7 @@ final readonly class CreateReviewAction
             if ($active >= config()->integer('oast.max_active_reviews')) {
                 throw new ActiveReviewLimitExceeded(60);
             }
+
             $review = new Review([
                 'spec_ref' => $specRef, 'spec_hash' => hash('sha256', $spec), 'spec' => $spec,
                 'mode' => $mode->value, 'dimension' => $dimension->value, 'panelists' => $panelists,

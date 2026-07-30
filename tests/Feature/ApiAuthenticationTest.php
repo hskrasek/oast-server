@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Http\Problems\ProblemType;
-use App\Models\PersonalAccessToken;
 use App\Tokens\PersonalAccessTokenService;
 use Illuminate\Support\Facades\Bus;
 
@@ -16,7 +15,8 @@ it('rejects anonymous and session-only API requests with problem details', funct
 });
 
 it('accepts only a valid organization token with the required ability', function (): void {
-    Bus::fake(); [$user, $organization] = memberFixture();
+    Bus::fake();
+    [$user, $organization] = memberFixture();
     $created = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
     $this->withToken($created->plainTextToken)->postJson("https://{$this->apiHost()}/reviews", ['spec' => 'openapi: 3.1.0'])->assertAccepted();
 });
@@ -34,8 +34,14 @@ it('rejects revoked expired and membership-orphaned tokens', function (string $s
     [$user, $organization, $membership] = memberFixture();
     $created = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
     $token = $created->accessToken;
-    if ($state === 'revoked') { $token->updateQuietly(['revoked_at' => now()]); }
-    if ($state === 'expired') { $token->updateQuietly(['expires_at' => now()->subMinute()]); }
-    if ($state === 'orphaned') { $membership->delete(); }
+    if ($state === 'revoked') {
+        $token->updateQuietly(['revoked_at' => now()]);
+    }
+    if ($state === 'expired') {
+        $token->updateQuietly(['expires_at' => now()->subMinute()]);
+    }
+    if ($state === 'orphaned') {
+        $membership->delete();
+    }
     $this->withToken($created->plainTextToken)->getJson("https://{$this->apiHost()}/reviews/999")->assertUnauthorized();
 })->with(['revoked', 'expired', 'orphaned']);

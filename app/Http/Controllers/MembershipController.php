@@ -20,6 +20,7 @@ final class MembershipController
         if (! $user instanceof User) {
             abort(403);
         }
+
         $service->remove($user, $membership);
 
         return back();

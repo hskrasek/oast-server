@@ -19,6 +19,7 @@ final class EnsureInstallationBootstrapped
         if (Installation::query()->findOrFail(1)->bootstrapped_at === null) {
             return redirect()->route('setup.show');
         }
+
         return $next($request);
     }
 }
