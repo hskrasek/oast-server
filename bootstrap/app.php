@@ -15,6 +15,10 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -108,6 +112,45 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->setDetail('The requested resource could not be found.');
 
             return ProblemResponse::from($problem, 404);
+        });
+
+        $exceptions->render(function (AuthenticationException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $problem = new ApiProblem('Unauthenticated', ProblemType::Unauthenticated->value)
+                ->setDetail('A valid bearer token is required.');
+
+            return ProblemResponse::from($problem, 401);
+        });
+
+        $exceptions->render(function (AuthorizationException|AccessDeniedHttpException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $problem = new ApiProblem('Forbidden', ProblemType::Forbidden->value)
+                ->setDetail('The credential cannot perform this action.');
+
+            return ProblemResponse::from($problem, 403);
+        });
+
+        $exceptions->render(function (ThrottleRequestsException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $retryAfter = $e->getHeaders()['Retry-After'] ?? 60;
+            $retry = match (true) {
+                is_int($retryAfter) => (string) $retryAfter,
+                is_string($retryAfter) => $retryAfter,
+                default => '60',
+            };
+            $problem = new ApiProblem('Rate limited', ProblemType::RateLimited->value)
+                ->setDetail('Too many requests.');
+
+            return ProblemResponse::from($problem, 429, ['Retry-After' => $retry]);
         });
 
         $exceptions->shouldRenderJsonWhen(
