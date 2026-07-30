@@ -41,3 +41,11 @@ Composer appends trailing args to single-command scripts, so `vendor/bin/pest <p
 
 - Format/lint with `composer lint` (Rector + Pint + `vp fmt`) before committing; Pint uses a committed `pint.json` (PER preset). `composer test:lint` is the non-mutating check.
 - Write tests alongside implementation using Pest's functional style (`it(...)`, `test(...)`, `expect(...)`). New code must keep line and type coverage at 100% — `composer test` enforces it.
+
+### M3A identity operations
+
+- Set a high-entropy `OAST_BOOTSTRAP_SECRET`; `/setup` is one-use and returns 404 after bootstrap.
+- `OAST_ENFORCE_EMAIL_VERIFICATION=false` keeps no-SMTP self-host installs usable; set it to `true` when mail works.
+- The API is bearer-only. Create organization-scoped PATs in `/app/settings/tokens`.
+- `oast:review` requires `--organization=<id>`.
+- Recovery commands: `oast:user:password <email>` and `oast:user:verify <email>`.
