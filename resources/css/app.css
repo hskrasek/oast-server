@@ -420,3 +420,27 @@
         background: var(--glow-horizon-line);
     }
 }
+
+@layer components {
+    .o-form {
+        @apply my-6 grid gap-3;
+    }
+    .o-form label {
+        @apply font-mono text-label uppercase tracking-label text-faint;
+    }
+    .o-error {
+        @apply font-mono text-mono-small text-danger;
+    }
+    .o-settings-nav {
+        @apply flex items-center gap-4 font-mono text-mono-ui;
+    }
+    .o-settings-nav a {
+        @apply text-muted no-underline hover:text-ink;
+    }
+    .o-table-management {
+        @apply w-full border-collapse font-mono text-mono-ui;
+    }
+    .o-table-management td {
+        @apply border-b border-hairline px-3 py-3;
+    }
+}

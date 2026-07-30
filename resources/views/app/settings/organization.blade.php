@@ -1,4 +1,4 @@
-<x-auth-layout title="Organization settings"><h1 class="o-headline">Organization settings</h1><x-form-errors />
+<x-app-layout title="Organization settings"><h1 class="o-headline">Organization settings</h1>
 @can('update', $organization)
 <form method="POST" action="{{ route('app.settings.organization.update') }}" class="o-form">@csrf @method('PATCH')
 <label for="name">Organization name</label><input class="o-input" id="name" name="name" value="{{ $organization->name }}" required><button class="o-btn" type="submit">Save</button></form>
@@ -7,11 +7,11 @@
 @can('delete', $membership)
 <form method="POST" action="{{ route('app.settings.organization.members.destroy', $membership) }}">@csrf @method('DELETE')<button data-confirm="Remove this member?" type="submit">Remove</button></form>
 @endcan
-@if($membership->user_id !== auth()->id())@can('update', $organization)<form method="POST" action="{{ route('app.settings.organization.ownership.transfer') }}">@csrf<input type="hidden" name="membership_id" value="{{ $membership->id }}"><button type="submit">Transfer ownership</button></form>@endcan@endif
+@if($membership->user_id !== auth()->id())@can('update', $organization)<form method="POST" action="{{ route('app.settings.organization.ownership.transfer') }}">@csrf<input type="hidden" name="membership_id" value="{{ $membership->id }}"><button type="submit">Transfer ownership</button></form>@endcan @endif
 </td></tr>@endforeach</tbody></table>
 <h2 class="o-title">Invitations</h2>@if(session('invitation_url'))<button type="button" data-copy="{{ session('invitation_url') }}">Copy invitation link</button>@endif
 @can('create', [App\Models\OrganizationInvitation::class, $organization])
 <form method="POST" action="{{ route('app.settings.organization.invitations.store') }}">@csrf<label for="invite_email">Email</label><input class="o-input" id="invite_email" name="email" type="email" required><button class="o-btn" type="submit">Invite</button></form>
 @endcan
-@foreach($organization->invitations as $invitation)@can('delete', $invitation)<form method="POST" action="{{ route('app.settings.organization.invitations.destroy', $invitation) }}">@csrf @method('DELETE')<span>{{ $invitation->email }}</span><button type="submit">Revoke</button></form>@endcan@endforeach
-</x-auth-layout>
+@foreach($organization->invitations as $invitation)@can('delete', $invitation)<form method="POST" action="{{ route('app.settings.organization.invitations.destroy', $invitation) }}">@csrf @method('DELETE')<span>{{ $invitation->email }}</span><button type="submit">Revoke</button></form>@endcan @endforeach
+</x-app-layout>
