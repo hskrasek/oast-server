@@ -16,7 +16,7 @@ final class PersonalAccessToken extends SanctumPersonalAccessToken
     /** @use HasFactory<PersonalAccessTokenFactory> */
     use HasFactory;
 
-    protected $fillable = ['organization_id', 'name', 'token', 'abilities', 'expires_at', 'revoked_at'];
+    protected $fillable = ['organization_id', 'name', 'token', 'abilities', 'expires_at', 'revoked_at', 'last_used_at'];
 
     /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo

@@ -6,6 +6,8 @@ namespace App\Providers;
 
 use App\Actions\Identity\CreateNewUser;
 use App\Actions\Identity\ResetUserPassword;
+use App\Actions\Identity\UpdateUserPassword;
+use App\Actions\Identity\UpdateUserProfileInformation;
 use App\Identity\CanonicalEmail;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -24,6 +26,8 @@ final class FortifyServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Fortify::createUsersUsing(CreateNewUser::class);
+        Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
+        Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
         Fortify::registerView(fn(Request $request) => view('auth.register', [
             'token' => $request->session()->get('oast.invitation.token'),
         ]));
