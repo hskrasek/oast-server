@@ -41,11 +41,6 @@ final class MembershipService
             $target->update(['role' => $role]);
         }, 3);
     }
-    public function leave(User $user): void
-    {
-        $target = OrganizationMembership::query()->where('user_id', $user->id)->firstOrFail();
-        $this->remove($user, $target);
-    }
     public function transferOwnership(User $actor, OrganizationMembership $target): void
     {
         DB::transaction(function () use ($actor, $target): void {
