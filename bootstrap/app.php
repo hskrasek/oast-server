@@ -7,6 +7,7 @@ use App\Council\Exceptions\PanelException;
 use App\Http\Middleware\CanonicalizeEmailInput;
 use App\Http\Problems\ProblemResponse;
 use App\Http\Problems\ProblemType;
+use App\Reviews\ActiveReviewLimitExceeded;
 use Crell\ApiProblem\ApiProblem;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -134,6 +135,18 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->setDetail('The credential cannot perform this action.');
 
             return ProblemResponse::from($problem, 403);
+        });
+
+        $exceptions->render(function (ActiveReviewLimitExceeded $e, Request $request) use ($onApi): Response {
+            $headers = ['Retry-After' => (string) $e->retryAfter];
+            if (! $onApi($request)) {
+                return response('Too many active reviews.', 429, $headers);
+            }
+            return ProblemResponse::from(
+                (new ApiProblem('Rate limited', ProblemType::RateLimited->value))->setDetail('Too many active reviews.'),
+                429,
+                $headers,
+            );
         });
 
         $exceptions->render(function (ThrottleRequestsException $e, Request $request) use ($onApi): ?Response {

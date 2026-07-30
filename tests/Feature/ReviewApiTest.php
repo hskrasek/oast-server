@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Ai\Agents\Panelist;
 use App\Jobs\RunPanelist;
 use App\Models\Review;
+use App\Tokens\PersonalAccessTokenService;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 
@@ -15,8 +16,10 @@ beforeEach(function (): void {
 
 it('returns 202 with a Location header and dispatches the batch', function () {
     Bus::fake();
+    [$user, $organization] = memberFixture();
+    $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
 
-    $response = $this->postJson("https://{$this->apiHost()}/reviews", [
+    $response = $this->withToken($token->plainTextToken)->postJson("https://{$this->apiHost()}/reviews", [
         'spec' => 'openapi: 3.1.0',
         'mode' => 'council',
     ]);
@@ -33,7 +36,10 @@ it('returns 202 with a Location header and dispatches the batch', function () {
 });
 
 it('returns a problem+json validation error when spec is missing', function () {
-    $this->postJson("https://{$this->apiHost()}/reviews", ['mode' => 'council'])
+    [$user, $organization] = memberFixture();
+    $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
+
+    $this->withToken($token->plainTextToken)->postJson("https://{$this->apiHost()}/reviews", ['mode' => 'council'])
         ->assertStatus(422)
         ->assertHeader('Content-Type', 'application/problem+json')
         ->assertJsonPath('type', App\Http\Problems\ProblemType::Validation)
@@ -43,8 +49,10 @@ it('returns a problem+json validation error when spec is missing', function () {
 
 it('accepts a workflows dimension and persists it', function () {
     fakeCouncil();
+    [$user, $organization] = memberFixture();
+    $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
 
-    $this->postJson("https://{$this->apiHost()}/reviews", [
+    $this->withToken($token->plainTextToken)->postJson("https://{$this->apiHost()}/reviews", [
         'spec' => 'openapi: 3.1.0',
         'dimension' => 'workflows',
     ])
@@ -55,7 +63,10 @@ it('accepts a workflows dimension and persists it', function () {
 });
 
 it('rejects an unknown dimension with a problem+json validation error', function () {
-    $this->postJson("https://{$this->apiHost()}/reviews", [
+    [$user, $organization] = memberFixture();
+    $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
+
+    $this->withToken($token->plainTextToken)->postJson("https://{$this->apiHost()}/reviews", [
         'spec' => 'openapi: 3.1.0',
         'dimension' => 'vibes',
     ])
@@ -76,8 +87,10 @@ it('persists an error row when the panel cannot reach quorum', function () {
     // failure path the way it actually runs.
     config(['queue.default' => 'database']);
     Panelist::fake(fn() => throw new RuntimeException('down'));
+    [$user, $organization] = memberFixture();
+    $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
 
-    $this->postJson("https://{$this->apiHost()}/reviews", ['spec' => 'openapi: 3.1.0', 'mode' => 'council'])
+    $this->withToken($token->plainTextToken)->postJson("https://{$this->apiHost()}/reviews", ['spec' => 'openapi: 3.1.0', 'mode' => 'council'])
         ->assertAccepted()
         ->assertJsonPath('data.status', 'running');
 
@@ -87,16 +100,21 @@ it('persists an error row when the panel cannot reach quorum', function () {
 });
 
 it('shows a review by id', function () {
-    $review = Review::factory()->create(['status' => 'complete', 'mode' => 'council']);
+    [$user, $organization] = memberFixture();
+    $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
+    $review = Review::factory()->for($organization)->create(['status' => 'complete', 'mode' => 'council']);
 
-    $this->getJson("https://{$this->apiHost()}/reviews/{$review->id}")
+    $this->withToken($token->plainTextToken)->getJson("https://{$this->apiHost()}/reviews/{$review->id}")
         ->assertOk()
         ->assertJsonPath('data.id', $review->id)
         ->assertJsonPath('data.status', 'complete');
 });
 
 it('404s an unknown review id as problem+json', function () {
-    $this->getJson("https://{$this->apiHost()}/reviews/999")
+    [$user, $organization] = memberFixture();
+    $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
+
+    $this->withToken($token->plainTextToken)->getJson("https://{$this->apiHost()}/reviews/999")
         ->assertNotFound()
         ->assertHeader('Content-Type', 'application/problem+json')
         ->assertJsonPath('type', App\Http\Problems\ProblemType::NotFound)
