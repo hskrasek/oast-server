@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Models\Installation;
 use App\Models\PersonalAccessToken;
 
-beforeEach(fn () => Installation::query()->findOrFail(1)->update(['bootstrapped_at' => now()]));
+beforeEach(fn() => Installation::query()->findOrFail(1)->update(['bootstrapped_at' => now()]));
 
 it('renders plaintext once on a private no-store get and never renders its hash', function (): void {
     [$owner] = memberFixture(role: 'owner');
@@ -32,4 +32,13 @@ it('uses fixed abilities and immutable organization scope', function (): void {
     $token = PersonalAccessToken::query()->sole();
     expect($token->organization_id)->toBe($organization->id)
         ->and($token->abilities)->toBe(['review:create', 'review:read', 'review:follow']);
+});
+
+it('revokes a token via the destroy route', function (): void {
+    [$owner] = memberFixture(role: 'owner');
+    $this->actingAs($owner)->withSession(['auth.password_confirmed_at' => time()])
+        ->post(route('app.settings.tokens.store'), ['name' => 'CI']);
+    $token = PersonalAccessToken::query()->sole();
+    $this->delete(route('app.settings.tokens.destroy', $token))->assertRedirect();
+    expect($token->refresh()->revoked_at)->not->toBeNull();
 });

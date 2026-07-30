@@ -7,7 +7,7 @@ use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
-beforeEach(fn () => Installation::query()->findOrFail(1)->update(['bootstrapped_at' => now()]));
+beforeEach(fn() => Installation::query()->findOrFail(1)->update(['bootstrapped_at' => now()]));
 
 it('requires recent confirmation and updates password through the app route', function (): void {
     [$user] = memberFixture();
@@ -24,7 +24,8 @@ it('requires recent confirmation and updates password through the app route', fu
 });
 
 it('resets verification and notifies only when enforcement is enabled', function (bool $enabled, int $sent): void {
-    Notification::fake(); [$user] = memberFixture();
+    Notification::fake();
+    [$user] = memberFixture();
     config(['oast.enforce_email_verification' => $enabled]);
     $this->actingAs($user)->withSession(['auth.password_confirmed_at' => time()])
         ->patch(route('app.settings.account.update'), ['name' => 'Changed', 'email' => ' NEW@EXAMPLE.TEST '])->assertRedirect();

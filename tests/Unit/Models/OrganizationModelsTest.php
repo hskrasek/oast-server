@@ -36,3 +36,12 @@ it('resolves review relationships correctly', function (): void {
     expect($review->organization()->sole()->is($review->organization))->toBeTrue()
         ->and($review->creator()->sole()->is($user))->toBeTrue();
 });
+
+it('resolves the installation default organization and an organizations reviews', function (): void {
+    $organization = App\Models\Organization::factory()->create();
+    App\Models\Installation::query()->findOrFail(1)->update(['default_organization_id' => $organization->id]);
+    $review = App\Models\Review::factory()->for($organization)->create();
+
+    expect(App\Models\Installation::query()->findOrFail(1)->defaultOrganization->is($organization))->toBeTrue()
+        ->and($organization->reviews()->sole()->is($review))->toBeTrue();
+});

@@ -40,3 +40,18 @@ it('transfers ownership in one transaction', function (): void {
     expect($ownerMembership->refresh()->role)->toBe(OrganizationRole::Member)
         ->and($target->refresh()->role)->toBe(OrganizationRole::Owner);
 });
+
+it('changes a members role', function (): void {
+    [$owner, $organization] = memberFixture(role: 'owner');
+    $member = App\Models\User::factory()->create();
+    $membership = OrganizationMembership::factory()->for($organization)->for($member)->create(['role' => OrganizationRole::Member]);
+    app(MembershipService::class)->changeRole($owner, $membership, OrganizationRole::Owner);
+    expect($membership->refresh()->role)->toBe(OrganizationRole::Owner);
+});
+
+it('rejects membership changes from a non-owner actor', function (): void {
+    [$member, $organization] = memberFixture(role: 'member');
+    $target = OrganizationMembership::factory()->for($organization)->for(App\Models\User::factory())->create();
+    expect(fn() => app(MembershipService::class)->remove($member, $target))
+        ->toThrow(Symfony\Component\HttpKernel\Exception\HttpException::class);
+});

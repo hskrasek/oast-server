@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\OrganizationRole;
 use App\Models\Installation;
+use App\Models\OrganizationInvitation;
 use App\Models\OrganizationMembership;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,36 @@ it('requires password confirmation for removal and transfer', function (): void 
     $target = OrganizationMembership::factory()->for($organization)->for(User::factory())->create();
     $this->actingAs($owner)->delete(route('app.settings.organization.members.destroy', $target))->assertRedirect(route('password.confirm'));
     $this->actingAs($owner)->post(route('app.settings.organization.ownership.transfer'), ['membership_id' => $target->id])->assertRedirect(route('password.confirm'));
+});
+
+it('completes member removal once password confirmed', function (): void {
+    [$owner, $organization] = memberFixture(role: 'owner');
+    $target = OrganizationMembership::factory()->for($organization)->for(User::factory())->create();
+    $this->actingAs($owner)->withSession(['auth.password_confirmed_at' => time()])
+        ->delete(route('app.settings.organization.members.destroy', $target))->assertRedirect();
+    expect(OrganizationMembership::query()->find($target->id))->toBeNull();
+});
+
+it('completes ownership transfer once password confirmed', function (): void {
+    [$owner, $organization] = memberFixture(role: 'owner');
+    $target = OrganizationMembership::factory()->for($organization)->for(User::factory())->create();
+    $this->actingAs($owner)->withSession(['auth.password_confirmed_at' => time()])
+        ->post(route('app.settings.organization.ownership.transfer'), ['membership_id' => $target->id])->assertRedirect();
+    expect($target->refresh()->role)->toBe(OrganizationRole::Owner);
+});
+
+it('lets owners revoke a pending invitation', function (): void {
+    [$owner, $organization] = memberFixture(role: 'owner');
+    $invitation = OrganizationInvitation::factory()->for($organization)->for($owner, 'inviter')->create();
+    $this->actingAs($owner)->delete(route('app.settings.organization.invitations.destroy', $invitation))->assertRedirect();
+    expect($invitation->refresh()->revoked_at)->not->toBeNull();
+});
+
+it('refuses to revoke an already-resolved invitation', function (): void {
+    [$owner, $organization] = memberFixture(role: 'owner');
+    $invitation = OrganizationInvitation::factory()->for($organization)->for($owner, 'inviter')->create(['revoked_at' => now()]);
+    expect(fn() => app(App\Organizations\InvitationService::class)->revoke($invitation))
+        ->toThrow(Illuminate\Validation\ValidationException::class);
 });
 
 it('serializes concurrent owner demotion and removal without lock-error credit', function (): void {

@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Actions\Installation\BootstrapInstallation;
+use App\Identity\RegistrationData;
 use App\Models\Installation;
 use App\Models\Organization;
 use App\Models\OrganizationMembership;
 use App\Models\Review;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\Support\FileDatabaseProcess;
 
 beforeEach(fn() => config(['oast.bootstrap_secret' => 'test-bootstrap-secret']));
@@ -18,6 +21,7 @@ it('requires a posted secret and bootstraps once into an existing route', functi
     expect(session('oast.setup.authorized'))->toBeNull();
     $this->post('/setup/authorize', ['bootstrap_secret' => 'wrong'])->assertSessionHasErrors('bootstrap_secret');
     $this->post('/setup/authorize', ['bootstrap_secret' => 'test-bootstrap-secret'])->assertRedirect(route('setup.show'));
+    $this->get('/setup')->assertOk()->assertSee('Create installation');
     $this->post('/setup', [
         'name' => 'Operator', 'email' => ' OWNER@EXAMPLE.TEST ', 'organization_name' => 'Acme',
         'password' => 'correct horse battery staple', 'password_confirmation' => 'correct horse battery staple',
@@ -31,6 +35,19 @@ it('requires a posted secret and bootstraps once into an existing route', functi
         ->and(Installation::query()->findOrFail(1)->bootstrapped_at)->not->toBeNull();
     $this->get('/app')->assertOk()->assertSee('Installation ready');
     $this->get('/setup')->assertNotFound();
+});
+
+it('404s posting the bootstrap secret once already bootstrapped', function (): void {
+    Installation::query()->findOrFail(1)->update(['bootstrapped_at' => now()]);
+    $this->post('/setup/authorize', ['bootstrap_secret' => 'test-bootstrap-secret'])->assertNotFound();
+});
+
+it('refuses to bootstrap an already-bootstrapped installation', function (): void {
+    Installation::query()->findOrFail(1)->update(['bootstrapped_at' => now()]);
+    expect(fn() => app(BootstrapInstallation::class)(
+        new RegistrationData('Operator', 'operator@example.test', 'correct horse battery staple'),
+        'Acme',
+    ))->toThrow(NotFoundHttpException::class);
 });
 
 it('serializes concurrent bootstrap against a file sqlite database', function (): void {

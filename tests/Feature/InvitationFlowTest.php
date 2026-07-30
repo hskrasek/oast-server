@@ -105,6 +105,37 @@ it('uses one unavailable response for unknown expired revoked and consumed token
         ->assertHeader('Referrer-Policy', 'no-referrer');
 })->with(['unknown', 'expired', 'revoked', 'consumed']);
 
+it('redirects start-login and start-registration to the unavailable view for a bad token', function (): void {
+    $token = str_repeat('a', 64);
+    $this->post(route('invitations.start-login', $token))->assertRedirect(route('invitations.show', $token));
+    $this->post(route('invitations.start-registration', $token))->assertRedirect(route('invitations.show', $token));
+});
+
+it('rejects accepting an unknown invitation token', function (): void {
+    [$owner] = memberFixture(role: 'owner');
+    $this->actingAs($owner)->post(route('invitations.accept', str_repeat('a', 64)))->assertSessionHasErrors('invitation');
+});
+
+it('rejects registration when the invitation token is unavailable', function (): void {
+    $this->post('/register', [
+        'name' => 'New Member', 'email' => 'new@example.test',
+        'password' => 'correct horse battery staple', 'password_confirmation' => 'correct horse battery staple',
+        'invitation_token' => str_repeat('a', 64),
+    ])->assertSessionHasErrors('invitation');
+    expect(User::query()->where('email', 'new@example.test')->exists())->toBeFalse();
+});
+
+it('rejects registration whose email does not match the invitation', function (): void {
+    [$owner, $organization] = memberFixture(role: 'owner');
+    $plain = basename(app(InvitationService::class)->createOrReplace($organization, $owner, 'invited@example.test')['url']);
+    $this->post('/register', [
+        'name' => 'New Member', 'email' => 'someone-else@example.test',
+        'password' => 'correct horse battery staple', 'password_confirmation' => 'correct horse battery staple',
+        'invitation_token' => $plain,
+    ])->assertSessionHasErrors('invitation');
+    expect(User::query()->where('email', 'someone-else@example.test')->exists())->toBeFalse();
+});
+
 it('rejects mismatched existing users and members without partial writes', function (): void {
     [$owner, $organization] = memberFixture(role: 'owner');
     $plain = basename(app(InvitationService::class)->createOrReplace($organization, $owner, 'new@example.test')['url']);

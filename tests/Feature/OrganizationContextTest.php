@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Installation;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
+use App\Organizations\MissingOrganizationMembership;
 use App\Organizations\OrganizationContext;
 
 it('resolves the sole browser membership', function (): void {
@@ -27,4 +28,9 @@ it('renders a holding page for a zero-membership user', function (): void {
     Installation::query()->findOrFail(1)->update(['bootstrapped_at' => now()]);
     $this->actingAs(User::factory()->create())->get('/app')->assertOk()
         ->assertSee('You are not a member of any organization');
+});
+
+it('throws resolving membership for an unauthenticated request', function (): void {
+    $context = new OrganizationContext(Illuminate\Http\Request::create('/'));
+    expect(fn() => $context->membership())->toThrow(MissingOrganizationMembership::class);
 });

@@ -70,3 +70,10 @@ it('makes real context authorization false after membership removal review reass
     }
     expect($context->stillAuthorized($review))->toBeFalse();
 })->with(['membership removed', 'review reassigned', 'pat expired']);
+
+it('denies stillAuthorized for an unauthenticated request', function (): void {
+    [, $organization] = memberFixture();
+    $review = Review::factory()->for($organization)->create(['status' => 'running']);
+    $context = new OrganizationContext(Illuminate\Http\Request::create('/'));
+    expect($context->stillAuthorized($review))->toBeFalse();
+});

@@ -9,6 +9,7 @@ use App\Models\OrganizationMembership;
 use App\Models\PersonalAccessToken;
 use App\Models\Review;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 final class OrganizationContext
@@ -97,6 +98,9 @@ final class OrganizationContext
         $token = $this->token();
 
         return ! $token instanceof PersonalAccessToken || PersonalAccessToken::query()->whereKey($token->id)
-            ->whereNull('revoked_at')->where(fn($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))->exists();
+            ->whereNull('revoked_at')->where(
+                /** @param Builder<PersonalAccessToken> $query */
+                fn(Builder $query): Builder => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()),
+            )->exists();
     }
 }
