@@ -24,17 +24,20 @@ namespace App\Http\Controllers {
 
 namespace {
     use App\Models\Review;
+    use App\Tokens\PersonalAccessTokenService;
     use Carbon\CarbonInterval;
     use Illuminate\Support\Sleep;
 
     beforeEach(fn() => config(['oast.api_domain' => 'api.oast.test']));
 
     it('streams stored events as SSE frames and closes on terminal', function (): void {
-        $review = Review::factory()->create(['status' => 'complete']);
+        [$user, $organization] = memberFixture();
+        $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
+        $review = Review::factory()->for($organization)->create(['status' => 'complete']);
         $review->appendEvent('review.queued', ['mode' => 'council']);
         $review->appendEvent('review.completed', ['findings' => [], 'total_cost_usd' => 0.1]);
 
-        $response = $this->get("https://{$this->apiHost()}/reviews/{$review->id}/events");
+        $response = $this->withToken($token->plainTextToken)->get("https://{$this->apiHost()}/reviews/{$review->id}/events");
 
         $response->assertOk()->assertHeader('Content-Type', 'text/event-stream; charset=UTF-8');
         $body = $response->streamedContent();
@@ -45,11 +48,14 @@ namespace {
     });
 
     it('replays only events after Last-Event-ID', function (): void {
-        $review = Review::factory()->create(['status' => 'complete']);
+        [$user, $organization] = memberFixture();
+        $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
+        $review = Review::factory()->for($organization)->create(['status' => 'complete']);
         $first = $review->appendEvent('review.queued', []);
         $review->appendEvent('review.completed', ['findings' => []]);
 
-        $body = $this->withHeader('Last-Event-ID', (string) $first->id)
+        $body = $this->withToken($token->plainTextToken)
+            ->withHeader('Last-Event-ID', (string) $first->id)
             ->get("https://{$this->apiHost()}/reviews/{$review->id}/events")
             ->streamedContent();
 
@@ -58,7 +64,10 @@ namespace {
     });
 
     it('404s an unknown review as problem+json', function (): void {
-        $this->get("https://{$this->apiHost()}/reviews/999/events")
+        [$user, $organization] = memberFixture();
+        $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
+
+        $this->withToken($token->plainTextToken)->get("https://{$this->apiHost()}/reviews/999/events")
             ->assertNotFound()
             ->assertHeader('Content-Type', 'application/problem+json')
             ->assertJsonPath('type', App\Http\Problems\ProblemType::NotFound)
@@ -68,10 +77,13 @@ namespace {
 
     it('polls while the connection is open, then stops once it drops', function (): void {
         Sleep::fake();
-        $review = Review::factory()->create(['status' => 'running']);
+        [$user, $organization] = memberFixture();
+        $token = app(PersonalAccessTokenService::class)->create($user, $organization, 'CI', null);
+        $review = Review::factory()->for($organization)->create(['status' => 'running']);
         $review->appendEvent('review.queued', ['mode' => 'council']);
 
-        $body = $this->get("https://{$this->apiHost()}/reviews/{$review->id}/events")
+        $body = $this->withToken($token->plainTextToken)
+            ->get("https://{$this->apiHost()}/reviews/{$review->id}/events")
             ->streamedContent();
 
         expect($body)->toContain('review.queued');
