@@ -114,6 +114,12 @@ return [
     | every email and IP address combination. However, if you would like to
     | specify a custom rate limiter to call then you may specify it here.
     |
+    | Fortify only reads a limiter key from this array for the routes it
+    | checks explicitly (login, two-factor, passkeys, verification) — it has
+    | no such hook for password.email (POST /forgot-password), so the
+    | 'forgot-password' limiter registered in FortifyServiceProvider is
+    | attached directly to that named route instead, once booted.
+    |
     */
 
     'limiters' => ['login' => 'login', 'passkeys' => null],

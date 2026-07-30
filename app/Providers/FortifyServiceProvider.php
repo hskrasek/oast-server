@@ -8,14 +8,19 @@ use App\Actions\Identity\CreateNewUser;
 use App\Actions\Identity\ResetUserPassword;
 use App\Actions\Identity\UpdateUserPassword;
 use App\Actions\Identity\UpdateUserProfileInformation;
+use App\Http\Responses\GenericPasswordResetLinkResponse;
 use App\Identity\CanonicalEmail;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route as RouteFacade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\ValidationException;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse as FailedPasswordResetLinkRequestResponseContract;
+use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse as SuccessfulPasswordResetLinkRequestResponseContract;
 use Laravel\Fortify\Fortify;
 
 final class FortifyServiceProvider extends ServiceProvider
@@ -62,5 +67,37 @@ final class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('login', fn(Request $request): Limit => Limit::perMinute(5)->by(
             CanonicalEmail::from($request->string('email')->value()) . '|' . $request->ip(),
         ));
+
+        RateLimiter::for('forgot-password', fn(Request $request): Limit => Limit::perMinute(5)->by(
+            CanonicalEmail::from($request->string('email')->value()) . '|' . $request->ip(),
+        ));
+
+        // Fortify's own route registration only reads config('fortify.limiters.*')
+        // for login/two-factor/passkeys/verification — password.email (POST
+        // /forgot-password) is registered with no limiter hook at all, so the
+        // 'forgot-password' limiter above can't be wired through config the way
+        // the others are. Attach it directly to the already-registered named
+        // route instead, once every provider (including Fortify's) has booted.
+        //
+        // Deliberately NOT RouteFacade::getRoutes()->getByName(): Fortify calls
+        // ->name() on the route object *after* Router::post() already added it
+        // to the RouteCollection, so RouteCollection's name-indexed lookup
+        // ($nameList) is built while the route is still unnamed and never gets
+        // refreshed until Illuminate's own RouteServiceProvider does so later
+        // in this same booted-callback queue. Scanning getName() directly reads
+        // the route object's current name instead of that stale index.
+        $this->app->booted(function (): void {
+            $route = collect(RouteFacade::getRoutes()->getRoutes())
+                ->first(fn(Route $candidate): bool => $candidate->getName() === 'password.email');
+            if ($route instanceof Route) {
+                $route->middleware('throttle:forgot-password');
+            }
+        });
+
+        // Both the "link sent" and "no such user" responses must be
+        // byte-identical, or the response itself becomes an enumeration
+        // oracle regardless of timing/throttling.
+        $this->app->bind(FailedPasswordResetLinkRequestResponseContract::class, GenericPasswordResetLinkResponse::class);
+        $this->app->bind(SuccessfulPasswordResetLinkRequestResponseContract::class, GenericPasswordResetLinkResponse::class);
     }
 }

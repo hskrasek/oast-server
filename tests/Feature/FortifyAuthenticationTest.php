@@ -51,3 +51,38 @@ it('serves verification and password confirmation views', function (): void {
     $this->actingAs($user)->get('/email/verify')->assertOk()->assertSee('Verify email');
     $this->actingAs($user)->get('/user/confirm-password')->assertOk()->assertSee('Confirm password');
 });
+
+it('gives an identical generic forgot-password response for known and unknown emails', function (): void {
+    Notification::fake();
+    User::factory()->create(['email' => 'owner@example.test']);
+
+    $known = $this->post('/forgot-password', ['email' => 'owner@example.test']);
+    $known->assertSessionHasNoErrors();
+    $knownStatus = session('status');
+
+    $unknown = $this->post('/forgot-password', ['email' => 'missing@example.test']);
+    $unknown->assertSessionHasNoErrors();
+    $unknownStatus = session('status');
+
+    expect($knownStatus)->not->toBeNull()->and($unknownStatus)->toBe($knownStatus);
+});
+
+it('gives the same generic message as json for known and unknown forgot-password emails', function (): void {
+    Notification::fake();
+    User::factory()->create(['email' => 'owner@example.test']);
+
+    $known = $this->postJson('/forgot-password', ['email' => 'owner@example.test'])->assertOk();
+    $unknown = $this->postJson('/forgot-password', ['email' => 'missing@example.test'])->assertOk();
+
+    expect($known->json('message'))->not->toBeNull()->and($unknown->json('message'))->toBe($known->json('message'));
+});
+
+it('throttles forgot-password requests after five attempts per email and ip', function (): void {
+    Notification::fake();
+    User::factory()->create(['email' => 'owner@example.test']);
+
+    for ($i = 0; $i < 5; $i++) {
+        $this->post('/forgot-password', ['email' => 'owner@example.test'])->assertSessionHasNoErrors();
+    }
+    $this->post('/forgot-password', ['email' => 'owner@example.test'])->assertTooManyRequests();
+});
