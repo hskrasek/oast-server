@@ -81,8 +81,11 @@ final class ReviewEventsController
         }
 
         $user = $request->user();
+        if (! $user instanceof User) {
+            abort(403);
+        }
 
-        return 'user:' . ($user instanceof User ? $user->id : '');
+        return 'user:' . $user->id;
     }
 
     private function emit(ReviewEvent $event): void
