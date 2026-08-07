@@ -14,9 +14,9 @@ it('allows creator or owner deletion and restricts creatorless reviews to owner'
     App\Models\OrganizationMembership::factory()->for($organization)->for($member)->create();
     $own = Review::factory()->for($organization)->create(['created_by_user_id' => $member->id]);
     $legacy = Review::factory()->for($organization)->create(['created_by_user_id' => null]);
-    $this->actingAs($member)->delete(route('app.reviews.destroy', $own))->assertNoContent();
+    $this->actingAs($member)->delete(route('app.reviews.destroy', $own))->assertRedirect(route('app.reviews.index'));
     $this->actingAs($member)->delete(route('app.reviews.destroy', $legacy))->assertForbidden();
-    $this->actingAs($owner)->delete(route('app.reviews.destroy', $legacy))->assertNoContent();
+    $this->actingAs($owner)->delete(route('app.reviews.destroy', $legacy))->assertRedirect(route('app.reviews.index'));
 });
 
 it('cascades events and panel responses', function (): void {
@@ -24,6 +24,6 @@ it('cascades events and panel responses', function (): void {
     $review = Review::factory()->for($organization)->create();
     $review->appendEvent('review.queued', []);
     $review->panelResponses()->create(['model' => 'a/one', 'ok' => true, 'ms' => 1, 'late' => false]);
-    $this->actingAs($owner)->delete(route('app.reviews.destroy', $review))->assertNoContent();
+    $this->actingAs($owner)->delete(route('app.reviews.destroy', $review))->assertRedirect(route('app.reviews.index'));
     expect(App\Models\ReviewEvent::query()->count())->toBe(0)->and(ReviewPanelResponse::query()->count())->toBe(0);
 });

@@ -81,3 +81,14 @@ it('emits a dynamic hashed og:image on a review page', function (): void {
 
     expect($html)->toMatch('#property="og:image" content="[^"]*/og/train-travel-domain-modeling-[a-f0-9]{8}\.png"#');
 });
+
+it('keeps public review routes publication-backed and unauthenticated', function (): void {
+    $private = App\Models\Review::factory()->create([
+        'id' => 999,
+        'spec_ref' => 'private-organization.yaml',
+    ]);
+
+    $this->get('/reviews')->assertOk()->assertSee('Train Travel API')->assertDontSee($private->spec_ref);
+    $this->get('/reviews/train-travel-domain-modeling')->assertOk()->assertSee('Booking lifecycle never modeled as data');
+    $this->get('/reviews/999')->assertNotFound();
+});
