@@ -93,8 +93,11 @@ it('aborts MembershipController::destroy without an authenticated user once auth
     [$owner, $organization] = memberFixture(role: 'owner');
     $target = OrganizationMembership::factory()->for($organization)->for(User::factory())->create();
     $this->actingAs($owner);
+    $contextRequest = Request::create('/');
+    $contextRequest->setUserResolver(fn() => $owner);
+    $context = new OrganizationContext($contextRequest);
     $request = nullUserRequest();
-    expect(fn() => (new MembershipController)->destroy($request, $target, app(MembershipService::class)))
+    expect(fn() => (new MembershipController)->destroy($request, (string) $target->id, $context, app(MembershipService::class)))
         ->toThrow(HttpException::class);
 });
 

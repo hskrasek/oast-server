@@ -34,7 +34,8 @@ final class InvitationService
         $url = route('invitations.show', ['token' => $plain]);
         try {
             Mail::to($email)->send(new OrganizationInvitationMail($url));
-        } catch (Throwable) {
+        } catch (Throwable $throwable) {
+            report($throwable);
         }
 
         return ['invitation' => $invitation, 'url' => $url];

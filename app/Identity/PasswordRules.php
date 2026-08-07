@@ -12,8 +12,13 @@ final class PasswordRules
     /** @return list<ValidationRule|string> */
     public static function base(): array
     {
+        $password = Password::min(12);
+        if (config()->boolean('oast.password_breach_check', true)) {
+            $password = $password->uncompromised();
+        }
+
         /** @var list<ValidationRule|string> */
-        $rules = ['required', 'string', Password::min(12)->uncompromised()];
+        $rules = ['required', 'string', $password];
         return $rules;
     }
 

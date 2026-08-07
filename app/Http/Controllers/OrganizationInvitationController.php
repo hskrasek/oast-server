@@ -28,10 +28,19 @@ final class OrganizationInvitationController
         return back()->with('invitation_url', $result['url']);
     }
 
-    public function destroy(OrganizationInvitation $invitation, InvitationService $service): RedirectResponse
+    public function destroy(string $invitation, OrganizationContext $context, InvitationService $service): RedirectResponse
     {
-        Gate::authorize('delete', $invitation);
-        $service->revoke($invitation);
+        // Scoped through the current org (matching ScopedReviewResolver's
+        // pattern) instead of an unscoped route-model binding: an
+        // unscoped binding lets a cross-organization id resolve and then
+        // fail authorization with 403, distinguishing it from a genuinely
+        // unknown id's 404 — an existence oracle. Scoping the query means
+        // a cross-organization id 404s identically to an unknown one.
+        $model = OrganizationInvitation::query()
+            ->where('organization_id', $context->organization()->id)
+            ->findOrFail($invitation);
+        Gate::authorize('delete', $model);
+        $service->revoke($model);
 
         return back();
     }

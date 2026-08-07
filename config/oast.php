@@ -31,6 +31,10 @@ return [
 
     'bootstrap_secret' => env('OAST_BOOTSTRAP_SECRET'),
     'enforce_email_verification' => (bool) env('OAST_ENFORCE_EMAIL_VERIFICATION', false),
+    // Password::uncompromised() calls the live Have I Been Pwned API. Air-gapped
+    // self-hosts have no outbound internet and would fail closed on every password
+    // change; set this to false there. Production (hosted) default stays ON.
+    'password_breach_check' => (bool) env('OAST_PASSWORD_BREACH_CHECK', true),
     'invitation_ttl_hours' => (int) env('OAST_INVITATION_TTL_HOURS', 72),
     'max_active_reviews' => (int) env('OAST_MAX_ACTIVE_REVIEWS', 10),
     'max_concurrent_streams' => (int) env('OAST_MAX_CONCURRENT_STREAMS', 5),

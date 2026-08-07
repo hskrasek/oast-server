@@ -53,6 +53,30 @@ it('lets owners revoke a pending invitation', function (): void {
     expect($invitation->refresh()->revoked_at)->not->toBeNull();
 });
 
+it('returns the identical 404 for unknown and cross-organization invitation ids', function (): void {
+    [$owner] = memberFixture(role: 'owner');
+    [$otherOwner, $otherOrganization] = memberFixture(role: 'owner');
+    $cross = OrganizationInvitation::factory()->for($otherOrganization)->for($otherOwner, 'inviter')->create();
+    $a = $this->actingAs($owner)->delete(route('app.settings.organization.invitations.destroy', $cross));
+    $b = $this->actingAs($owner)->delete(route('app.settings.organization.invitations.destroy', 999999));
+    $a->assertNotFound();
+    $b->assertNotFound();
+    expect($cross->refresh()->revoked_at)->toBeNull();
+});
+
+it('returns the identical 404 for unknown and cross-organization membership ids', function (): void {
+    [$owner] = memberFixture(role: 'owner');
+    [, $otherOrganization] = memberFixture(role: 'owner');
+    $cross = OrganizationMembership::factory()->for($otherOrganization)->for(User::factory())->create();
+    $a = $this->actingAs($owner)->withSession(['auth.password_confirmed_at' => time()])
+        ->delete(route('app.settings.organization.members.destroy', $cross));
+    $b = $this->actingAs($owner)->withSession(['auth.password_confirmed_at' => time()])
+        ->delete(route('app.settings.organization.members.destroy', 999999));
+    $a->assertNotFound();
+    $b->assertNotFound();
+    expect(OrganizationMembership::query()->find($cross->id))->not->toBeNull();
+});
+
 it('refuses to revoke an already-resolved invitation', function (): void {
     [$owner, $organization] = memberFixture(role: 'owner');
     $invitation = OrganizationInvitation::factory()->for($organization)->for($owner, 'inviter')->create(['revoked_at' => now()]);

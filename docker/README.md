@@ -34,6 +34,10 @@ location /app/reviews/ {
 
 The application also emits `X-Accel-Buffering: no`. Other proxies must disable response buffering and allow streams for at least 600 seconds.
 
+## Password breach checks (HIBP)
+
+Password changes validate against the live Have I Been Pwned API by default (`OAST_PASSWORD_BREACH_CHECK=true`). Air-gapped self-hosts with no outbound internet must set `OAST_PASSWORD_BREACH_CHECK=false`, or every password change fails closed. Leave it `true` whenever outbound HTTPS is available.
+
 ## Health
 
 `GET /up` verifies database connectivity and zero pending migrations. `/usr/local/bin/oast-worker-health` separately verifies exactly `OAST_QUEUE_WORKERS` queue processes are `RUNNING`. Docker combines both checks.

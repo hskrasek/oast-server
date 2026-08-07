@@ -7,6 +7,7 @@ use App\Council\Exceptions\PanelException;
 use App\Http\Middleware\CanonicalizeEmailInput;
 use App\Http\Problems\ProblemResponse;
 use App\Http\Problems\ProblemType;
+use App\Organizations\MissingOrganizationMembership;
 use App\Reviews\ActiveReviewLimitExceeded;
 use App\Streaming\StreamLimitExceeded;
 use Crell\ApiProblem\ApiProblem;
@@ -27,7 +28,6 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__ . '/../routes/web.php',
         api: __DIR__ . '/../routes/api.php',
         commands: __DIR__ . '/../routes/console.php',
-        health: null,
         apiPrefix: '',
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -114,6 +114,21 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->setDetail('The requested resource could not be found.');
 
             return ProblemResponse::from($problem, 404);
+        });
+
+        $exceptions->render(function (MissingOrganizationMembership $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            // Guards against the microsecond race where a membership row is
+            // deleted between Sanctum's authenticateAccessTokensUsing check
+            // and a controller re-resolving OrganizationContext — without
+            // this, the exception escapes uncaught and renders as a 500.
+            $problem = new ApiProblem('Forbidden', ProblemType::Forbidden->value)
+                ->setDetail('The organization membership required for this action no longer exists.');
+
+            return ProblemResponse::from($problem, 403);
         });
 
         $exceptions->render(function (AuthenticationException $e, Request $request) use ($onApi): ?Response {
