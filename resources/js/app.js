@@ -1,11 +1,18 @@
+import Alpine from "alpinejs";
+
+window.Alpine = Alpine;
+Alpine.start();
+
 document.addEventListener("click", async (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
+
     const copy = target.closest("[data-copy]");
     if (copy instanceof HTMLElement) {
         await navigator.clipboard.writeText(copy.dataset.copy ?? "");
         copy.textContent = "Copied";
     }
+
     const confirm = target.closest("[data-confirm]");
     if (
         confirm instanceof HTMLElement &&
