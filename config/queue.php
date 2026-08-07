@@ -42,10 +42,9 @@ return [
             'connection' => env('DB_QUEUE_CONNECTION'),
             'table' => env('DB_QUEUE_TABLE', 'jobs'),
             'queue' => env('DB_QUEUE', 'default'),
-            // Must exceed the longest panel/judge call (oast.timeout): a large
-            // spec's 4+ minute panelist outlives the 90s default, gets
-            // redelivered mid-flight, and the judge sees its critique twice.
-            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 700),
+            // Must exceed the supervised worker timeout (900 seconds), otherwise a still-running
+            // panel or judge job may be reserved and delivered again before the worker is killed.
+            'retry_after' => (int) env('DB_QUEUE_RETRY_AFTER', 960),
             'after_commit' => false,
         ],
 

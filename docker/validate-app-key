@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+
+if ! php -r '
+$key = getenv("APP_KEY");
+$key = is_string($key) ? $key : "";
+$sentinels = [
+    "01234567890123456789012345678901",
+    "00000000000000000000000000000000",
+    str_repeat("\0", 32),
+];
+if ($key === "") { exit(1); }
+if (str_starts_with($key, "base64:")) {
+    $decoded = base64_decode(substr($key, 7), true);
+    if (! is_string($decoded) || strlen($decoded) !== 32 || in_array($decoded, $sentinels, true)) { exit(1); }
+    exit(0);
+}
+if (strlen($key) !== 32 || in_array($key, $sentinels, true)) { exit(1); }
+exit(0);
+'; then
+    echo "APP_KEY must be a non-placeholder 32-byte Laravel key." >&2
+    exit 64
+fi
