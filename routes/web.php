@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 use App\Http\Controllers\AccountPasswordController;
 use App\Http\Controllers\AccountSettingsController;
+use App\Http\Controllers\App\CreateReviewController;
+use App\Http\Controllers\App\ReviewIndexController as AppReviewIndexController;
+use App\Http\Controllers\App\ShowReviewController as AppShowReviewController;
+use App\Http\Controllers\App\StoreReviewController;
 use App\Http\Controllers\DeleteReviewController;
 use App\Http\Controllers\InvitationAcceptanceController;
 use App\Http\Controllers\InvitationController;
@@ -11,9 +15,7 @@ use App\Http\Controllers\MembershipController;
 use App\Http\Controllers\OrganizationInvitationController;
 use App\Http\Controllers\OrganizationSettingsController;
 use App\Http\Controllers\OwnershipTransferController;
-use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ReviewEventsController;
-use App\Http\Controllers\ShowReviewController;
 use App\Http\Controllers\Site\ConfirmSubscriptionController;
 use App\Http\Controllers\Site\HomeController;
 use App\Http\Controllers\Site\OgImageController;
@@ -87,11 +89,24 @@ Route::prefix('app')->name('app.')->middleware(['installation', 'auth', 'verifie
             Route::delete('/members/{membership}', [MembershipController::class, 'destroy'])->middleware('password.confirm')->name('members.destroy');
             Route::post('/ownership', OwnershipTransferController::class)->middleware('password.confirm')->name('ownership.transfer');
         });
-        Route::prefix('reviews')->name('reviews.')->group(function (): void {
-            Route::post('/', [ReviewController::class, 'store'])->name('store');
-            Route::get('/{review}', ShowReviewController::class)->name('show');
-            Route::get('/{review}/events', ReviewEventsController::class)->name('events');
-            Route::delete('/{review}', DeleteReviewController::class)->name('destroy');
-        });
     });
 });
+
+Route::prefix('app/reviews')
+    ->name('app.reviews.')
+    ->middleware(['installation', 'auth', 'verified.configured', 'organization'])
+    ->group(function (): void {
+        Route::get('/', AppReviewIndexController::class)->name('index');
+        // Deviation from brief: bare ::class action syntax makes Laravel's
+        // RouteAction::makeInvokable() eagerly assert method_exists(..., '__invoke')
+        // at route registration (every request), not at dispatch — so referencing
+        // Task 4/5's not-yet-created controllers this way breaks the whole app.
+        // [Class::class, '__invoke'] is the lazy equivalent (Reflector::isCallable
+        // short-circuits on syntax alone); switch back to ::class once those
+        // controllers exist.
+        Route::get('/create', [CreateReviewController::class, '__invoke'])->name('create');
+        Route::post('/', [StoreReviewController::class, '__invoke'])->name('store');
+        Route::get('/{review}', [AppShowReviewController::class, '__invoke'])->name('show');
+        Route::get('/{review}/events', ReviewEventsController::class)->name('events');
+        Route::delete('/{review}', DeleteReviewController::class)->name('destroy');
+    });
