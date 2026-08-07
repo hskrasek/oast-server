@@ -99,14 +99,7 @@ Route::prefix('app/reviews')
         Route::get('/', AppReviewIndexController::class)->name('index');
         Route::get('/create', CreateReviewController::class)->name('create');
         Route::post('/', StoreReviewController::class)->name('store');
-        // Deviation from brief: bare ::class action syntax makes Laravel's
-        // RouteAction::makeInvokable() eagerly assert method_exists(..., '__invoke')
-        // at route registration (every request), not at dispatch — so referencing
-        // Task 5's not-yet-created ShowReviewController this way breaks the whole
-        // app. [Class::class, '__invoke'] is the lazy equivalent (Reflector::
-        // isCallable short-circuits on syntax alone); switch back to ::class once
-        // that controller exists.
-        Route::get('/{review}', [AppShowReviewController::class, '__invoke'])->name('show');
+        Route::get('/{review}', AppShowReviewController::class)->name('show');
         Route::get('/{review}/events', ReviewEventsController::class)->name('events');
         Route::delete('/{review}', DeleteReviewController::class)->name('destroy');
     });
