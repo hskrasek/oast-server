@@ -97,15 +97,15 @@ Route::prefix('app/reviews')
     ->middleware(['installation', 'auth', 'verified.configured', 'organization'])
     ->group(function (): void {
         Route::get('/', AppReviewIndexController::class)->name('index');
+        Route::get('/create', CreateReviewController::class)->name('create');
+        Route::post('/', StoreReviewController::class)->name('store');
         // Deviation from brief: bare ::class action syntax makes Laravel's
         // RouteAction::makeInvokable() eagerly assert method_exists(..., '__invoke')
         // at route registration (every request), not at dispatch — so referencing
-        // Task 4/5's not-yet-created controllers this way breaks the whole app.
-        // [Class::class, '__invoke'] is the lazy equivalent (Reflector::isCallable
-        // short-circuits on syntax alone); switch back to ::class once those
-        // controllers exist.
-        Route::get('/create', [CreateReviewController::class, '__invoke'])->name('create');
-        Route::post('/', [StoreReviewController::class, '__invoke'])->name('store');
+        // Task 5's not-yet-created ShowReviewController this way breaks the whole
+        // app. [Class::class, '__invoke'] is the lazy equivalent (Reflector::
+        // isCallable short-circuits on syntax alone); switch back to ::class once
+        // that controller exists.
         Route::get('/{review}', [AppShowReviewController::class, '__invoke'])->name('show');
         Route::get('/{review}/events', ReviewEventsController::class)->name('events');
         Route::delete('/{review}', DeleteReviewController::class)->name('destroy');

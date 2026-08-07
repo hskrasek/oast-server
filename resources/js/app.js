@@ -1,6 +1,8 @@
 import Alpine from "alpinejs";
+import { reviewSubmission } from "./review-submission.js";
 
 window.Alpine = Alpine;
+Alpine.data("reviewSubmission", reviewSubmission);
 Alpine.start();
 
 document.addEventListener("click", async (event) => {
