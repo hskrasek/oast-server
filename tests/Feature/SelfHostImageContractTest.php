@@ -17,6 +17,29 @@ it('defines the supervised persistent database-backed contract', function (): vo
         ->and($readme)->toContain('proxy_buffering off', 'proxy_read_timeout 600s', 'OAST_QUEUE_WORKERS', 'Backup and restore', 'DB_QUEUE_RETRY_AFTER=960');
 });
 
+it('keeps queue retry_after synchronized across sources and strictly greater than the worker timeout', function (): void {
+    $queueConfig = (string) file_get_contents(base_path('config/queue.php'));
+    $envExample = (string) file_get_contents(base_path('.env.example'));
+    $dockerfile = (string) file_get_contents(base_path('Dockerfile'));
+    $supervisor = (string) file_get_contents(base_path('docker/supervisord.conf'));
+
+    preg_match("/'retry_after' => \(int\) env\('DB_QUEUE_RETRY_AFTER', (\d+)\)/", $queueConfig, $configMatch);
+    preg_match('/DB_QUEUE_RETRY_AFTER=(\d+)/', $envExample, $envMatch);
+    preg_match('/DB_QUEUE_RETRY_AFTER=(\d+)/', $dockerfile, $dockerfileMatch);
+    preg_match('/queue:listen --tries=\d+ --timeout=(\d+)/', $supervisor, $timeoutMatch);
+
+    expect($configMatch)->toHaveCount(2)
+        ->and($envMatch)->toHaveCount(2)
+        ->and($dockerfileMatch)->toHaveCount(2)
+        ->and($timeoutMatch)->toHaveCount(2);
+
+    $retryAfterValues = [(int) $configMatch[1], (int) $envMatch[1], (int) $dockerfileMatch[1]];
+    $timeout = (int) $timeoutMatch[1];
+
+    expect(array_unique($retryAfterValues))->toHaveCount(1)
+        ->and($retryAfterValues[0])->toBeGreaterThan($timeout);
+});
+
 it('rejects missing malformed and explicit raw or base64 sentinel keys', function (string $key): void {
     $process = new Process([base_path('docker/validate-app-key')], base_path(), ['APP_KEY' => $key]);
     $process->run();
