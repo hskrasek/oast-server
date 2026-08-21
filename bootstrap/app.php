@@ -139,7 +139,7 @@ return Application::configure(basePath: dirname(__DIR__))
             $problem = new ApiProblem('Unauthenticated', ProblemType::Unauthenticated->value)
                 ->setDetail('A valid bearer token is required.');
 
-            return ProblemResponse::from($problem, 401);
+            return ProblemResponse::from($problem, 401, ['WWW-Authenticate' => 'Bearer']);
         });
 
         $exceptions->render(function (AuthorizationException|AccessDeniedHttpException $e, Request $request) use ($onApi): ?Response {

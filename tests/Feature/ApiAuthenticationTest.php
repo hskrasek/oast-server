@@ -13,6 +13,7 @@ use Laravel\Sanctum\Events\TokenAuthenticated;
 it('rejects anonymous and session-only API requests with problem details', function (): void {
     $this->postJson("https://{$this->apiHost()}/reviews", ['spec' => 'openapi: 3.1.0'])
         ->assertUnauthorized()->assertHeader('Content-Type', 'application/problem+json')
+        ->assertHeader('WWW-Authenticate', 'Bearer')
         ->assertJsonPath('type', ProblemType::Unauthenticated->value);
     [$user] = memberFixture();
     $this->actingAs($user)->postJson("https://{$this->apiHost()}/reviews", ['spec' => 'openapi: 3.1.0'])->assertUnauthorized();
@@ -84,5 +85,6 @@ it('never accepts a session-cookie-authenticated request on the api domain', fun
 
     $this->getJson("https://{$this->apiHost()}/reviews/1", ['Referer' => (string) config('app.url')])
         ->assertUnauthorized()->assertHeader('Content-Type', 'application/problem+json')
+        ->assertHeader('WWW-Authenticate', 'Bearer')
         ->assertJsonPath('type', ProblemType::Unauthenticated->value);
 });
