@@ -16,4 +16,6 @@ parameters:
 
     level: max
 
+    parseModelCastsMethod: true
+
     tmpDir: /tmp/phpstan

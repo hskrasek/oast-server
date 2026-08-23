@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\Installation;
+use App\Models\PersonalAccessToken;
+use App\Models\User;
+use App\Organizations\MissingOrganizationMembership;
+use App\Organizations\OrganizationContext;
+
+it('resolves the sole browser membership', function (): void {
+    Installation::query()->findOrFail(1)->update(['bootstrapped_at' => now()]);
+    [$user, $organization] = memberFixture();
+    $this->actingAs($user)->get('/app')->assertOk();
+    expect(app(OrganizationContext::class)->organization()->is($organization))->toBeTrue();
+});
+
+it('resolves a token organization only through a matching membership', function (): void {
+    [$user, $organization] = memberFixture();
+    $token = PersonalAccessToken::factory()->for($user, 'tokenable')->for($organization)->create();
+    $user->withAccessToken($token);
+    request()->setUserResolver(fn() => $user);
+    app()->forgetScopedInstances();
+    expect(app(OrganizationContext::class)->organization()->is($organization))->toBeTrue();
+});
+
+it('renders a holding page for a zero-membership user', function (): void {
+    Installation::query()->findOrFail(1)->update(['bootstrapped_at' => now()]);
+    $this->actingAs(User::factory()->create())->get('/app')->assertOk()
+        ->assertSee('You are not a member of any organization');
+});
+
+it('throws resolving membership for an unauthenticated request', function (): void {
+    $context = new OrganizationContext(Illuminate\Http\Request::create('/'));
+    expect(fn() => $context->membership())->toThrow(MissingOrganizationMembership::class);
+});

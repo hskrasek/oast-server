@@ -420,3 +420,168 @@
         background: var(--glow-horizon-line);
     }
 }
+
+@layer components {
+    .o-form {
+        @apply my-6 grid gap-3;
+    }
+    .o-form label {
+        @apply font-mono text-label uppercase tracking-label text-faint;
+    }
+    .o-error {
+        @apply font-mono text-mono-small text-danger;
+    }
+    .o-settings-nav {
+        @apply flex items-center gap-4 font-mono text-mono-ui;
+    }
+    .o-settings-nav a {
+        @apply text-muted no-underline hover:text-ink;
+    }
+    .o-table-management {
+        @apply w-full border-collapse font-mono text-mono-ui;
+    }
+    .o-table-management td {
+        @apply border-b border-hairline px-3 py-3;
+    }
+}
+
+@layer components {
+    [x-cloak] {
+        display: none !important;
+    }
+    .o-app-page {
+        @apply mx-auto flex w-full max-w-page flex-col gap-7 px-6 py-10;
+    }
+    .o-page-head {
+        @apply flex flex-col justify-between gap-5 sm:flex-row sm:items-end;
+    }
+    .o-state-card {
+        @apply flex flex-col items-start gap-4 rounded-card border border-edge bg-raised p-6 font-mono text-mono-ui text-muted;
+    }
+    .o-review-list {
+        @apply overflow-hidden rounded-card border border-edge;
+    }
+    .o-review-row {
+        @apply grid gap-3 border-b border-hairline px-5 py-4 last:border-b-0 md:grid-cols-[1fr_110px_100px_auto] md:items-center;
+    }
+    .o-review-row:hover {
+        @apply bg-raised;
+    }
+    .o-review-row a {
+        @apply no-underline;
+    }
+    .o-review-row strong {
+        @apply block font-mono text-mono-ui font-medium text-ink;
+    }
+    .o-review-row small {
+        @apply mt-1 block font-mono text-mono-small text-subtle;
+    }
+    .o-status {
+        @apply w-fit rounded-badge border border-edge-strong px-2 py-1 font-mono text-badge font-semibold uppercase tracking-badge;
+    }
+    .o-status-queued,
+    .o-status-running {
+        @apply text-muted;
+    }
+    .o-status-judging {
+        @apply border-amber text-amber;
+    }
+    .o-status-complete {
+        @apply border-success text-success;
+    }
+    .o-status-error {
+        @apply border-danger text-danger;
+    }
+    .o-review-cost {
+        @apply font-mono text-mono-ui text-ember md:text-right;
+    }
+    .o-review-error {
+        @apply font-mono text-mono-small text-danger md:col-span-4;
+    }
+    .o-btn-danger {
+        @apply border-danger bg-transparent text-danger;
+    }
+    .o-btn-danger:hover {
+        @apply bg-ember text-on-accent;
+    }
+}
+
+@layer components {
+    .o-review-form {
+        @apply flex flex-col gap-6 rounded-card border border-edge bg-raised p-6;
+    }
+    .o-source-tabs {
+        @apply flex gap-2;
+    }
+    .o-source-tabs button {
+        @apply rounded-control border border-edge-strong px-4 py-2 font-mono text-mono-ui text-muted;
+    }
+    .o-source-tabs button[aria-selected="true"] {
+        @apply border-ember text-ember;
+    }
+    .o-field {
+        @apply flex flex-col gap-2 font-mono text-mono-ui text-muted;
+    }
+    .o-field textarea,
+    .o-field select,
+    .o-field input {
+        @apply rounded-control border border-edge-strong bg-sunken px-3 py-3 font-mono text-mono-ui text-ink;
+    }
+    .o-review-options {
+        @apply grid gap-4 sm:grid-cols-2;
+    }
+}
+
+@layer components {
+    .o-page-actions {
+        @apply flex items-center gap-3;
+    }
+    .o-stream-banner {
+        @apply rounded-control border border-edge bg-raised px-4 py-3 font-mono text-mono-small text-muted;
+    }
+    .o-stream-banner-error {
+        @apply border-danger text-danger;
+    }
+    .o-progress-panel {
+        @apply rounded-card border border-edge bg-sunken p-6;
+    }
+    .o-progress-panel ol {
+        @apply mt-5 flex flex-col gap-2 font-mono text-mono-small;
+    }
+    .o-progress-panel li {
+        @apply flex justify-between border-b border-hairline py-2 text-muted;
+    }
+    .o-report-grid {
+        @apply grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.8fr)];
+    }
+    .o-findings-pane,
+    .o-finding-group {
+        @apply flex min-w-0 flex-col gap-5;
+    }
+    .o-source-pane {
+        @apply min-w-0 self-start overflow-hidden rounded-card border border-edge bg-sunken xl:sticky xl:top-5;
+    }
+    .o-source-pane > h2,
+    .o-source-fallback {
+        @apply border-b border-edge-soft px-4 py-3;
+    }
+    .o-source-fallback {
+        @apply font-mono text-mono-small text-amber;
+    }
+    .o-source-pane pre {
+        @apply max-h-[72vh] overflow-auto py-3 font-mono text-[12px] leading-5;
+    }
+    .o-source-line {
+        @apply grid min-h-5 grid-cols-[52px_1fr] px-3;
+    }
+    .o-source-line i {
+        @apply select-none pr-4 text-right not-italic text-faint;
+    }
+    .o-source-line b {
+        @apply whitespace-pre font-normal text-body;
+    }
+    .o-source-line.is-highlighted {
+        @apply bg-voice-a-wash;
+        box-shadow: inset 3px 0 var(--color-ember);
+    }
+}

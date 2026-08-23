@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Override;
 
@@ -17,7 +18,7 @@ final class Review extends Model
     use HasFactory;
 
     #[Override]
-    protected $guarded = [];
+    protected $guarded = ['organization_id', 'created_by_user_id'];
 
     #[Override]
     protected $casts = [
@@ -26,6 +27,18 @@ final class Review extends Model
         'metrics' => 'array',
         'panel_size' => 'integer',
     ];
+
+    /** @return BelongsTo<Organization, $this> */
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
+    }
 
     /**
      * @return HasMany<ReviewEvent, $this>

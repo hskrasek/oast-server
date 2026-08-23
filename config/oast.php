@@ -8,9 +8,6 @@ return [
     // The api.* subdomain the REST API is served on.
     'api_domain' => env('OAST_API_DOMAIN', 'api.oast.test'),
 
-    // Gate the entire api surface behind a feature flag.
-    'api_enabled' => (bool) env('OAST_API_ENABLED', true),
-
     // Panelist model slugs (OpenRouter). Hardcoded for M0; config-driven roster in M1.
     // Confirm exact OpenRouter slugs before the first live run.
     'panelists' => [
@@ -31,4 +28,14 @@ return [
 
     // Seconds to wait for a straggling panelist after quorum before the judge starts.
     'quorum_grace' => (int) env('OAST_QUORUM_GRACE', 60),
+
+    'bootstrap_secret' => env('OAST_BOOTSTRAP_SECRET'),
+    'enforce_email_verification' => (bool) env('OAST_ENFORCE_EMAIL_VERIFICATION', false),
+    // Password::uncompromised() calls the live Have I Been Pwned API. Air-gapped
+    // self-hosts have no outbound internet and would fail closed on every password
+    // change; set this to false there. Production (hosted) default stays ON.
+    'password_breach_check' => (bool) env('OAST_PASSWORD_BREACH_CHECK', true),
+    'invitation_ttl_hours' => (int) env('OAST_INVITATION_TTL_HOURS', 72),
+    'max_active_reviews' => (int) env('OAST_MAX_ACTIVE_REVIEWS', 10),
+    'max_concurrent_streams' => (int) env('OAST_MAX_CONCURRENT_STREAMS', 5),
 ];

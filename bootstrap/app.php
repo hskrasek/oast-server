@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 use App\Council\Exceptions\JudgeException;
 use App\Council\Exceptions\PanelException;
+use App\Http\Middleware\CanonicalizeEmailInput;
 use App\Http\Problems\ProblemResponse;
 use App\Http\Problems\ProblemType;
+use App\Organizations\MissingOrganizationMembership;
+use App\Reviews\ActiveReviewLimitExceeded;
+use App\Streaming\StreamLimitExceeded;
 use Crell\ApiProblem\ApiProblem;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -14,13 +18,16 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__ . '/../routes/web.php',
         api: __DIR__ . '/../routes/api.php',
         commands: __DIR__ . '/../routes/console.php',
-        health: '/up',
         apiPrefix: '',
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -36,6 +43,23 @@ return Application::configure(basePath: dirname(__DIR__))
             headers: Request::HEADER_X_FORWARDED_FOR
                 | Request::HEADER_X_FORWARDED_PROTO
                 | Request::HEADER_X_FORWARDED_PORT,
+        );
+        $middleware->append(CanonicalizeEmailInput::class);
+        $middleware->alias([
+            'installation' => App\Http\Middleware\EnsureInstallationBootstrapped::class,
+            'verified.configured' => App\Http\Middleware\EnsureEmailIsVerifiedWhenConfigured::class,
+            'organization' => App\Http\Middleware\EnsureOrganizationMembership::class,
+            'ability' => Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
+            'abilities' => Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+        ]);
+        // Fortify's route group ends with SubstituteBindings (a late-priority
+        // middleware), so our unprioritized gate would otherwise sort after
+        // it — and Laravel's priority sort then hoists 'auth' to just before
+        // SubstituteBindings, ahead of our gate too. Giving the gate an
+        // explicit priority before Authenticate keeps it first regardless.
+        $middleware->prependToPriorityList(
+            before: Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: App\Http\Middleware\EnsureInstallationBootstrapped::class,
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -90,6 +114,86 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->setDetail('The requested resource could not be found.');
 
             return ProblemResponse::from($problem, 404);
+        });
+
+        $exceptions->render(function (MissingOrganizationMembership $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            // Guards against the microsecond race where a membership row is
+            // deleted between Sanctum's authenticateAccessTokensUsing check
+            // and a controller re-resolving OrganizationContext — without
+            // this, the exception escapes uncaught and renders as a 500.
+            $problem = new ApiProblem('Forbidden', ProblemType::Forbidden->value)
+                ->setDetail('The organization membership required for this action no longer exists.');
+
+            return ProblemResponse::from($problem, 403);
+        });
+
+        $exceptions->render(function (AuthenticationException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $problem = new ApiProblem('Unauthenticated', ProblemType::Unauthenticated->value)
+                ->setDetail('A valid bearer token is required.');
+
+            return ProblemResponse::from($problem, 401, ['WWW-Authenticate' => 'Bearer']);
+        });
+
+        $exceptions->render(function (AuthorizationException|AccessDeniedHttpException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $problem = new ApiProblem('Forbidden', ProblemType::Forbidden->value)
+                ->setDetail('The credential cannot perform this action.');
+
+            return ProblemResponse::from($problem, 403);
+        });
+
+        $exceptions->render(function (ActiveReviewLimitExceeded $e, Request $request) use ($onApi): Response {
+            $headers = ['Retry-After' => (string) $e->retryAfter];
+            if (! $onApi($request)) {
+                return response('Too many active reviews.', 429, $headers);
+            }
+
+            return ProblemResponse::from(
+                new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many active reviews.'),
+                429,
+                $headers,
+            );
+        });
+
+        $exceptions->render(function (StreamLimitExceeded $e, Request $request) use ($onApi): Response {
+            $headers = ['Retry-After' => (string) $e->retryAfter];
+            if (! $onApi($request)) {
+                return response('', 429, $headers);
+            }
+
+            return ProblemResponse::from(
+                new ApiProblem('Rate limited', ProblemType::RateLimited->value)->setDetail('Too many concurrent event streams.'),
+                429,
+                $headers,
+            );
+        });
+
+        $exceptions->render(function (ThrottleRequestsException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $retryAfter = $e->getHeaders()['Retry-After'] ?? 60;
+            $retry = match (true) {
+                is_int($retryAfter) => (string) $retryAfter,
+                is_string($retryAfter) => $retryAfter,
+                default => '60',
+            };
+            $problem = new ApiProblem('Rate limited', ProblemType::RateLimited->value)
+                ->setDetail('Too many requests.');
+
+            return ProblemResponse::from($problem, 429, ['Retry-After' => $retry]);
         });
 
         $exceptions->shouldRenderJsonWhen(

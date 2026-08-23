@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Organization;
 use App\Models\Review;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -10,10 +11,23 @@ use Illuminate\Support\Facades\Http;
 
 beforeEach(function (): void {
     Http::fake(['openrouter.ai/api/v1/models' => Http::response(['data' => []])]);
+    $this->organization = Organization::factory()->create();
+});
+
+it('requires an explicit organization', function (): void {
+    $this->artisan('oast:review', ['spec' => base_path('fixtures/specs/train-travel.yaml')])
+        ->expectsOutputToContain('The --organization option is required.')->assertFailed();
+});
+
+it('fails when the organization is not found', function (): void {
+    $this->artisan('oast:review', [
+        'spec' => base_path('fixtures/specs/train-travel.yaml'),
+        '--organization' => (string) ($this->organization->id + 1),
+    ])->expectsOutputToContain('Organization not found.')->assertFailed();
 });
 
 it('fails when the spec file is missing', function (): void {
-    $this->artisan('oast:review', ['spec' => '/no/such/file.yaml'])
+    $this->artisan('oast:review', ['spec' => '/no/such/file.yaml', '--organization' => (string) $this->organization->id])
         ->assertFailed();
 });
 
@@ -21,7 +35,7 @@ it('fails on an unknown dimension without convening the panel', function (): voi
     $path = sys_get_temp_dir() . '/oast-spec-' . uniqid() . '.yaml';
     file_put_contents($path, 'openapi: 3.1.0');
 
-    $this->artisan('oast:review', ['spec' => $path, '--dimension' => 'vibes'])
+    $this->artisan('oast:review', ['spec' => $path, '--dimension' => 'vibes', '--organization' => (string) $this->organization->id])
         ->assertFailed();
 
     expect(Review::query()->count())->toBe(0);
@@ -34,7 +48,7 @@ it('runs a council review end-to-end on the sync queue and prints findings', fun
     $spec = tempnam(sys_get_temp_dir(), 'spec');
     file_put_contents((string) $spec, 'openapi: 3.1.0');
 
-    $this->artisan('oast:review', ['spec' => $spec])
+    $this->artisan('oast:review', ['spec' => $spec, '--organization' => (string) $this->organization->id])
         ->expectsOutputToContain('review.completed')
         ->expectsOutputToContain('Order exposes DB join table')
         ->assertExitCode(0);
@@ -55,7 +69,7 @@ it('exits non-zero when the review fails', function (): void {
     $spec = tempnam(sys_get_temp_dir(), 'spec');
     file_put_contents((string) $spec, 'openapi: 3.1.0');
 
-    $this->artisan('oast:review', ['spec' => $spec])->assertExitCode(1);
+    $this->artisan('oast:review', ['spec' => $spec, '--organization' => (string) $this->organization->id])->assertExitCode(1);
 
     unlink((string) $spec);
 });
@@ -65,7 +79,7 @@ it('runs a baseline review from a spec file and persists it', function (): void 
     $path = sys_get_temp_dir() . '/oast-spec-' . uniqid() . '.yaml';
     file_put_contents($path, 'openapi: 3.1.0');
 
-    $this->artisan('oast:review', ['spec' => $path, '--baseline' => true])
+    $this->artisan('oast:review', ['spec' => $path, '--baseline' => true, '--organization' => (string) $this->organization->id])
         ->assertSuccessful();
 
     expect(Review::query()->where('mode', 'baseline')->where('status', 'complete')->count())->toBe(1);
@@ -78,7 +92,7 @@ it('runs a review for the workflows dimension and persists it', function (): voi
     $path = sys_get_temp_dir() . '/oast-spec-' . uniqid() . '.yaml';
     file_put_contents($path, 'openapi: 3.1.0');
 
-    $this->artisan('oast:review', ['spec' => $path, '--dimension' => 'workflows'])
+    $this->artisan('oast:review', ['spec' => $path, '--dimension' => 'workflows', '--organization' => (string) $this->organization->id])
         ->assertSuccessful();
 
     expect(Review::query()->where('dimension', 'workflows')->where('status', 'complete')->count())->toBe(1);
@@ -97,7 +111,7 @@ it('times out waiting for the review to finish', function (): void {
     $path = sys_get_temp_dir() . '/oast-spec-' . uniqid() . '.yaml';
     file_put_contents($path, 'openapi: 3.1.0');
 
-    $this->artisan('oast:review', ['spec' => $path, '--timeout' => 1])
+    $this->artisan('oast:review', ['spec' => $path, '--timeout' => 1, '--organization' => (string) $this->organization->id])
         ->expectsOutputToContain('Timed out waiting for the review to finish.')
         ->assertExitCode(1);
 

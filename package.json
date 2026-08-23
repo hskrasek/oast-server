@@ -6,7 +6,8 @@
         "build": "vp build",
         "dev": "vp dev",
         "lint": "NODE_OPTIONS='--experimental-strip-types' vp fmt resources/",
-        "test:lint": "NODE_OPTIONS='--experimental-strip-types' vp fmt --check resources/"
+        "test:lint": "NODE_OPTIONS='--experimental-strip-types' vp fmt --check resources/",
+        "test:js": "bunx vitest run"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.2.2",
@@ -16,14 +17,16 @@
         "playwright": "^1.59.1",
         "tailwindcss": "^4.2.2",
         "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-        "vite-plus": "latest"
+        "vite-plus": "latest",
+        "vitest": "^4.1.10"
     },
     "overrides": {
-        "vite": "npm:@voidzero-dev/vite-plus-core@latest",
-        "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
+        "vite": "npm:@voidzero-dev/vite-plus-core@latest"
     },
     "dependencies": {
         "@fontsource-variable/newsreader": "^5.2.10",
-        "@fontsource/ibm-plex-mono": "^5.2.7"
+        "@fontsource/ibm-plex-mono": "^5.2.7",
+        "alpinejs": "^3.15.0",
+        "yaml": "^2.9.0"
     }
 }
