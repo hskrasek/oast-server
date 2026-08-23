@@ -30,7 +30,7 @@ final class TokenSettingsController
             // would render a dead Revoke control and read as live credentials.
             'tokens' => $user->tokens()->where('organization_id', $context->organization()->id)
                 ->whereNull('revoked_at')
-                ->where(fn($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+                ->where(fn(\Illuminate\Contracts\Database\Query\Builder $query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
                 ->latest()->get(),
             'plainToken' => is_string($sealed) ? Crypt::decryptString($sealed) : null,
         ]);
