@@ -20,6 +20,30 @@ it('renders plaintext once on a private no-store get and never renders its hash'
     $this->get(route('app.settings.tokens.index'))->assertDontSee($matches[0])->assertDontSee($token->token);
 });
 
+it('never stores the plaintext token unencrypted in the session', function (): void {
+    [$owner] = memberFixture(role: 'owner');
+    $this->actingAs($owner)->withSession(['auth.password_confirmed_at' => time()]);
+    $this->post(route('app.settings.tokens.store'), ['name' => 'CI']);
+    $token = PersonalAccessToken::query()->sole();
+
+    $sealed = session('oast.new_token');
+    expect($sealed)->toBeString()->not->toMatch('/\d+\|[A-Za-z0-9]+/');
+    $plain = Illuminate\Support\Facades\Crypt::decryptString($sealed);
+    expect(hash('sha256', explode('|', $plain, 2)[1]))->toBe($token->token);
+});
+
+it('lists only tokens that can still authenticate', function (): void {
+    [$owner, $organization] = memberFixture(role: 'owner');
+    $live = $owner->tokens()->create(['organization_id' => $organization->id, 'name' => 'live', 'token' => hash('sha256', 'a'), 'abilities' => []]);
+    $owner->tokens()->create(['organization_id' => $organization->id, 'name' => 'revoked', 'token' => hash('sha256', 'b'), 'abilities' => [], 'revoked_at' => now()]);
+    $owner->tokens()->create(['organization_id' => $organization->id, 'name' => 'expired', 'token' => hash('sha256', 'c'), 'abilities' => [], 'expires_at' => now()->subMinute()]);
+
+    $this->actingAs($owner)->withSession(['auth.password_confirmed_at' => time()])
+        ->get(route('app.settings.tokens.index'))
+        ->assertOk()->assertSee('live')->assertDontSee('revoked')->assertDontSee('expired')
+        ->assertSee(route('app.settings.tokens.destroy', $live));
+});
+
 it('requires password confirmation for token creation and revocation', function (): void {
     [$owner] = memberFixture(role: 'owner');
     $this->actingAs($owner)->post(route('app.settings.tokens.store'), ['name' => 'CI'])->assertRedirect(route('password.confirm'));
