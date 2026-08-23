@@ -17,7 +17,7 @@ it('shows deletion to creator and owner but not an unrelated member', function (
     $member = User::factory()->create();
     OrganizationMembership::factory()->for($organization)->for($creator)->create();
     OrganizationMembership::factory()->for($organization)->for($member)->create();
-    $review = Review::factory()->for($organization)->create(['created_by_user_id' => $creator->id]);
+    $review = Review::factory()->for($organization)->create(['created_by_user_id' => $creator->id, 'status' => 'complete']);
     // Deviation from the brief: `app.reviews.destroy` and `app.reviews.show` share the
     // same URI (`/app/reviews/{review}`, differing only by HTTP verb), and the page also
     // embeds `eventsUrl: '.../reviews/{id}/events'`. A bare-URL assertSee/assertDontSee
@@ -31,9 +31,17 @@ it('shows deletion to creator and owner but not an unrelated member', function (
     $this->actingAs($member)->get(route('app.reviews.show', $review->id))->assertDontSee($formAction, false);
 });
 
+it('hides deletion while a review is still active', function (): void {
+    [$owner, $organization] = memberFixture(role: 'owner');
+    $review = Review::factory()->for($organization)->create(['created_by_user_id' => $owner->id, 'status' => 'running']);
+    $formAction = 'action="' . route('app.reviews.destroy', $review->id) . '"';
+
+    $this->actingAs($owner)->get(route('app.reviews.show', $review->id))->assertDontSee($formAction, false);
+});
+
 it('deletes through the scoped M3A action and redirects to history', function (): void {
     [$owner, $organization] = memberFixture(role: 'owner');
-    $review = Review::factory()->for($organization)->create();
+    $review = Review::factory()->for($organization)->create(['status' => 'complete']);
 
     $this->actingAs($owner)->delete(route('app.reviews.destroy', $review->id))
         ->assertRedirect(route('app.reviews.index'))

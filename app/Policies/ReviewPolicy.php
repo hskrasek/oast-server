@@ -23,6 +23,12 @@ final class ReviewPolicy
 
     public function delete(User $user, Review $review): bool
     {
+        // Queued/running/judging reviews have live batch jobs that would fail
+        // (after incurring model spend) if their row disappeared mid-flight.
+        if (! in_array($review->status, ['complete', 'error'], true)) {
+            return false;
+        }
+
         return $review->created_by_user_id === $user->id || OrganizationMembership::query()->where('user_id', $user->id)->where('organization_id', $review->organization_id)->where('role', OrganizationRole::Owner)->exists();
     }
 }
