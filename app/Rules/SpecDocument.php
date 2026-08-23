@@ -27,7 +27,10 @@ final class SpecDocument implements ValidationRule
             return;
         }
 
-        if (mb_strlen($spec) > self::MAX_BYTES) {
+        // '8bit' counts bytes, not characters — a multibyte document must not
+        // slip past the 5 MiB cap. (Pint's mb_str_functions rewrites a bare
+        // strlen() here, so the byte semantics must be explicit.)
+        if (mb_strlen($spec, '8bit') > self::MAX_BYTES) {
             $fail('The :attribute may not be larger than 5 MiB.');
             return;
         }
@@ -37,8 +40,11 @@ final class SpecDocument implements ValidationRule
             return;
         }
 
-        if (! is_array($this->parse($spec))) {
-            $fail('The :attribute must be a parseable YAML or JSON document.');
+        $parsed = $this->parse($spec);
+        // A top-level sequence ([] / "- value") parses but cannot be an
+        // OpenAPI document; only mappings may reach the paid panel.
+        if (! is_array($parsed) || array_is_list($parsed)) {
+            $fail('The :attribute must be a parseable YAML or JSON mapping.');
         }
     }
 

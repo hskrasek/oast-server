@@ -23,11 +23,16 @@ it('rejects invalid UTF-8 bytes', function (): void {
 it('rejects documents that do not parse to a mapping', function (): void {
     expect(specDocumentPasses('just some prose'))->toBeFalse()
         ->and(specDocumentPasses("k: v\n\tbroken"))->toBeFalse()
-        ->and(specDocumentPasses('"a bare json string"'))->toBeFalse();
+        ->and(specDocumentPasses('"a bare json string"'))->toBeFalse()
+        ->and(specDocumentPasses('[]'))->toBeFalse()
+        ->and(specDocumentPasses("- openapi\n- 3.1.0\n"))->toBeFalse();
 });
 
 it('rejects oversized and non-string values', function (): void {
     expect(specDocumentPasses(str_repeat('a', 5 * 1024 * 1024 + 1)))->toBeFalse()
+        // Multibyte characters: byte count exceeds the cap even though the
+        // character count stays under it.
+        ->and(specDocumentPasses(str_repeat('é', 3 * 1024 * 1024)))->toBeFalse()
         ->and(specDocumentPasses(42))->toBeFalse();
 });
 
