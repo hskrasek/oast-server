@@ -23,6 +23,25 @@ it('redirects invitation continuations to setup before bootstrap', function (): 
     $this->post(route('invitations.accept', $token))->assertRedirect(route('setup.show'));
 });
 
+it('gives the identical invitation error for known and unknown emails on register', function (): void {
+    User::factory()->create(['email' => 'existing@example.test']);
+    $register = fn(string $email) => $this->from('/register')->post('/register', [
+        'name' => 'Someone', 'email' => $email,
+        'password' => 'correct horse battery staple', 'password_confirmation' => 'correct horse battery staple',
+        'invitation_token' => str_repeat('a', 64),
+    ]);
+
+    $register('existing@example.test')->assertSessionHasErrors('invitation')->assertSessionDoesntHaveErrors('email');
+    $register('unknown@example.test')->assertSessionHasErrors('invitation')->assertSessionDoesntHaveErrors('email');
+});
+
+it('throttles registration after five attempts per ip', function (): void {
+    for ($i = 0; $i < 5; $i++) {
+        $this->post('/register', ['invitation_token' => str_repeat('a', 64)])->assertSessionHasErrors();
+    }
+    $this->post('/register', ['invitation_token' => str_repeat('a', 64)])->assertTooManyRequests();
+});
+
 it('rejects a consumed invitation before inserting the invited user', function (): void {
     [$owner, $organization] = memberFixture(role: 'owner');
     $plain = basename(app(InvitationService::class)->createOrReplace($organization, $owner, 'new@example.test')['url']);

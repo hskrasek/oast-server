@@ -23,13 +23,17 @@ final readonly class CreateNewUser implements CreatesNewUsers
     public function create(array $input): User
     {
         Validator::make($input, [
-            'name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'name' => ['required', 'string', 'max:255'], 'email' => ['required', 'email', 'max:255'],
             'password' => PasswordRules::confirmed(), 'invitation_token' => ['required', 'string', 'size:64'],
         ])->validate();
         $invitation = $this->invitations->find($input['invitation_token']);
         if (!$invitation instanceof OrganizationInvitation || ! $invitation->available()) {
             throw ValidationException::withMessages(['invitation' => 'This invitation is not available.']);
         }
+
+        // Uniqueness only after a live invitation is established: running it
+        // first would tell anonymous callers whether an address has an account.
+        Validator::make($input, ['email' => ['unique:users,email']])->validate();
 
         $user = $this->policy->register(new RegistrationData($input['name'], CanonicalEmail::from($input['email']), $input['password']), $invitation);
         request()->session()->forget(['oast.invitation.token', 'url.intended']);

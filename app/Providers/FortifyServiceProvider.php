@@ -13,7 +13,6 @@ use App\Identity\CanonicalEmail;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route as RouteFacade;
@@ -77,6 +76,10 @@ final class FortifyServiceProvider extends ServiceProvider
             CanonicalEmail::from($request->string('email')->value()) . '|' . $request->ip(),
         ));
 
+        // By IP alone: registration is anonymous, so keying on submitted email
+        // would let a probing client rotate addresses past the limiter.
+        RateLimiter::for('register', fn(Request $request): Limit => Limit::perMinute(5)->by((string) $request->ip()));
+
         // Fortify's own route registration only reads config('fortify.limiters.*')
         // for login/two-factor/passkeys/verification — password.email (POST
         // /forgot-password) is registered with no limiter hook at all, so the
@@ -92,10 +95,12 @@ final class FortifyServiceProvider extends ServiceProvider
         // in this same booted-callback queue. Scanning getName() directly reads
         // the route object's current name instead of that stale index.
         $this->app->booted(function (): void {
-            $route = collect(RouteFacade::getRoutes()->getRoutes())
-                ->first(fn(Route $candidate): bool => $candidate->getName() === 'password.email');
-            if ($route instanceof Route) {
-                $route->middleware('throttle:forgot-password');
+            $limited = ['password.email' => 'throttle:forgot-password', 'register.store' => 'throttle:register'];
+            foreach (RouteFacade::getRoutes()->getRoutes() as $candidate) {
+                $throttle = $limited[$candidate->getName() ?? ''] ?? null;
+                if ($throttle !== null) {
+                    $candidate->middleware($throttle);
+                }
             }
         });
 
