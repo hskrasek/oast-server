@@ -80,7 +80,7 @@ it('never accepts a session-cookie-authenticated request on the api domain', fun
     Installation::query()->findOrFail(1)->update(['bootstrapped_at' => now()]);
     $user = User::factory()->create(['password' => 'correct horse battery staple']);
     $this->post('/login', ['email' => $user->email, 'password' => 'correct horse battery staple'])
-        ->assertRedirect('/');
+        ->assertRedirect('/app/reviews');
     $this->assertAuthenticatedAs($user);
 
     $this->getJson("https://{$this->apiHost()}/reviews/1", ['Referer' => (string) config('app.url')])

@@ -14,7 +14,7 @@ it('logs in by canonical email and logs out only by post', function (): void {
     $user = User::factory()->create(['email' => 'owner@example.test', 'password' => 'correct horse battery staple']);
 
     $this->post('/login', ['email' => ' OWNER@EXAMPLE.TEST ', 'password' => 'correct horse battery staple'])
-        ->assertRedirect('/');
+        ->assertRedirect('/app/reviews');
     $this->assertAuthenticatedAs($user);
     $this->get('/logout')->assertMethodNotAllowed();
     $this->post('/logout')->assertRedirect('/');

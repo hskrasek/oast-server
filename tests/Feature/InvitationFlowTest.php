@@ -79,7 +79,7 @@ it('registers and consumes an invitation atomically', function (): void {
         'name' => 'New Member', 'email' => ' NEW@EXAMPLE.TEST ',
         'password' => 'correct horse battery staple', 'password_confirmation' => 'correct horse battery staple',
         'invitation_token' => $plain,
-    ])->assertRedirect('/');
+    ])->assertRedirect('/app/reviews');
     $user = User::query()->where('email', 'new@example.test')->sole();
     expect(OrganizationMembership::query()->where('user_id', $user->id)->value('organization_id'))->toBe($organization->id)
         ->and(OrganizationInvitation::query()->where('email', 'new@example.test')->value('accepted_at'))->not->toBeNull();
