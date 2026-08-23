@@ -13,5 +13,5 @@
 @can('create', [App\Models\OrganizationInvitation::class, $organization])
 <form method="POST" action="{{ route('app.settings.organization.invitations.store') }}">@csrf<label for="invite_email">Email</label><input class="o-input" id="invite_email" name="email" type="email" required><button class="o-btn" type="submit">Invite</button></form>
 @endcan
-@foreach($organization->invitations as $invitation)@can('delete', $invitation)<form method="POST" action="{{ route('app.settings.organization.invitations.destroy', $invitation) }}">@csrf @method('DELETE')<span>{{ $invitation->email }}</span><button type="submit">Revoke</button></form>@endcan @endforeach
+@foreach($organization->invitations->filter->available() as $invitation)@can('delete', $invitation)<form method="POST" action="{{ route('app.settings.organization.invitations.destroy', $invitation) }}">@csrf @method('DELETE')<span>{{ $invitation->email }}</span><button type="submit">Revoke</button></form>@endcan @endforeach
 </x-app-layout>

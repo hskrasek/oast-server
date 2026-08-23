@@ -35,6 +35,15 @@ it('shows only current organization history and all real status labels', functio
     $response->assertSee('$0.1250')->assertSee('Panel quorum not met')->assertDontSee('private.yaml');
 });
 
+it('does not hydrate retained specs or findings for the index', function (): void {
+    [$user, $organization] = memberFixture(role: 'owner');
+    Review::factory()->for($organization)->create(['spec' => str_repeat('a: b', 100)]);
+
+    $this->actingAs($user)->get('/app/reviews')->assertOk()
+        ->assertViewHas('reviews', fn($reviews): bool => ! array_key_exists('spec', $reviews->first()->getAttributes())
+            && ! array_key_exists('findings', $reviews->first()->getAttributes()));
+});
+
 it('renders an explicit empty state and create action', function (): void {
     [$user] = memberFixture(role: 'owner');
 

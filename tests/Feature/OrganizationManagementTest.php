@@ -56,6 +56,19 @@ it('returns the identical 404 for unknown and cross-organization membership ids 
     $confirmed()->post(route('app.settings.organization.ownership.transfer'), ['membership_id' => $foreign->id])->assertNotFound();
 });
 
+it('shows revoke controls only for still-available invitations', function (): void {
+    [$owner, $organization] = memberFixture(role: 'owner');
+    $pending = OrganizationInvitation::factory()->for($organization)->for($owner, 'inviter')->create(['email' => 'pending@example.test']);
+    OrganizationInvitation::factory()->for($organization)->for($owner, 'inviter')->create(['email' => 'accepted@example.test', 'accepted_at' => now()]);
+    OrganizationInvitation::factory()->for($organization)->for($owner, 'inviter')->create(['email' => 'revoked@example.test', 'revoked_at' => now()]);
+    OrganizationInvitation::factory()->for($organization)->for($owner, 'inviter')->create(['email' => 'expired@example.test', 'expires_at' => now()->subMinute()]);
+
+    $this->actingAs($owner)->get(route('app.settings.organization.show'))->assertOk()
+        ->assertSee('pending@example.test')
+        ->assertSee(route('app.settings.organization.invitations.destroy', $pending))
+        ->assertDontSee('accepted@example.test')->assertDontSee('revoked@example.test')->assertDontSee('expired@example.test');
+});
+
 it('lets owners revoke a pending invitation', function (): void {
     [$owner, $organization] = memberFixture(role: 'owner');
     $invitation = OrganizationInvitation::factory()->for($organization)->for($owner, 'inviter')->create();

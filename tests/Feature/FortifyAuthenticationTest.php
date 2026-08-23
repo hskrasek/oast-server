@@ -104,6 +104,14 @@ it('gives the same generic message as json for known and unknown forgot-password
     expect($known->json('message'))->not->toBeNull()->and($unknown->json('message'))->toBe($known->json('message'));
 });
 
+it('renders the flashed status on auth pages after a forgot-password submission', function (): void {
+    Notification::fake();
+    User::factory()->create(['email' => 'owner@example.test']);
+
+    $this->from('/forgot-password')->post('/forgot-password', ['email' => 'owner@example.test'])->assertRedirect('/forgot-password');
+    $this->get('/forgot-password')->assertOk()->assertSee('If that account exists, we sent a password reset link.');
+});
+
 it('throttles forgot-password requests after five attempts per email and ip', function (): void {
     Notification::fake();
     User::factory()->create(['email' => 'owner@example.test']);
