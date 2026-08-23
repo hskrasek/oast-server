@@ -18,21 +18,35 @@ The worker uses `--timeout=900`. Keep `DB_QUEUE_RETRY_AFTER=960` (or another val
 
 ## Reverse proxy and TLS
 
-Remote exposure requires TLS and secure cookies. Keep Docker published on `127.0.0.1` and put the TLS proxy on the host. Nginx's SSE location must include:
+Remote exposure requires TLS and secure cookies. Keep Docker published on `127.0.0.1`, put the TLS proxy on the host, and add `-e SESSION_SECURE_COOKIE=true` to the `docker run` command so the session cookie is never sent over plain HTTP. The application trusts its immediate proxy's forwarded headers, so the proxy **must overwrite** `X-Forwarded-For` with the connection address — passing a client-supplied value through lets remote clients spoof their IP and bypass the login, password-reset, and setup rate limits. Web spec uploads accept files up to 5 MiB, so raise Nginx's 1 MiB default body limit:
 
 ```nginx
+client_max_body_size 10m;
+
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $remote_addr;
+}
+
 location /app/reviews/ {
     proxy_pass http://127.0.0.1:8080;
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $remote_addr;
     proxy_buffering off;
     proxy_cache off;
     proxy_read_timeout 600s;
 }
 ```
 
-The application also emits `X-Accel-Buffering: no`. Other proxies must disable response buffering and allow streams for at least 600 seconds.
+The application also emits `X-Accel-Buffering: no`. Other proxies must disable response buffering, allow streams for at least 600 seconds, and likewise overwrite `X-Forwarded-For` from the connection address.
+
+## API hostname
+
+The bearer-token API only answers on the hostname in `OAST_API_DOMAIN` (default `api.oast.test`); PATs generated in `/app/settings/tokens` are unusable until that host resolves and is proxied. Pick an API subdomain, point DNS (or `/etc/hosts`) at the proxy, pass `-e OAST_API_DOMAIN=api.example.com` to `docker run`, and add a TLS `server` block for it that proxies to the same container with the headers above.
 
 ## Password breach checks (HIBP)
 
