@@ -46,6 +46,16 @@ it('completes ownership transfer once password confirmed', function (): void {
     expect($target->refresh()->role)->toBe(OrganizationRole::Owner);
 });
 
+it('returns the identical 404 for unknown and cross-organization membership ids on transfer', function (): void {
+    [$owner] = memberFixture(role: 'owner');
+    [, $otherOrganization] = memberFixture(role: 'owner');
+    $foreign = OrganizationMembership::factory()->for($otherOrganization)->for(User::factory())->create();
+
+    $confirmed = fn() => $this->actingAs($owner)->withSession(['auth.password_confirmed_at' => time()]);
+    $confirmed()->post(route('app.settings.organization.ownership.transfer'), ['membership_id' => 999999])->assertNotFound();
+    $confirmed()->post(route('app.settings.organization.ownership.transfer'), ['membership_id' => $foreign->id])->assertNotFound();
+});
+
 it('lets owners revoke a pending invitation', function (): void {
     [$owner, $organization] = memberFixture(role: 'owner');
     $invitation = OrganizationInvitation::factory()->for($organization)->for($owner, 'inviter')->create();

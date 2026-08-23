@@ -19,6 +19,10 @@ final class TransferOwnershipRequest extends FormRequest
      */
     public function rules(): array
     {
-        return ['membership_id' => ['required', 'integer', 'exists:organization_memberships,id']];
+        // No `exists` rule: a global existence check answers differently for
+        // unknown IDs (422) than for other organizations' memberships (404),
+        // leaking which IDs exist. The controller's org-scoped findOrFail
+        // returns the same 404 for both.
+        return ['membership_id' => ['required', 'integer']];
     }
 }
