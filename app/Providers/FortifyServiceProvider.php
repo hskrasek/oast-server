@@ -18,7 +18,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse as FailedPasswordResetLinkRequestResponseContract;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse as SuccessfulPasswordResetLinkRequestResponseContract;
 use Laravel\Fortify\Fortify;
@@ -53,12 +52,18 @@ final class FortifyServiceProvider extends ServiceProvider
         $confirmPassword = 'auth.confirm-password';
         Fortify::confirmPasswordView(fn(): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View => view($confirmPassword));
 
-        Fortify::authenticateUsing(function (Request $request): User {
+        Fortify::authenticateUsing(function (Request $request): ?User {
             $user = User::query()->where('email', CanonicalEmail::from($request->string('email')->value()))->first();
             $password = $request->string('password')->value();
             $hash = $user instanceof User ? $user->password : self::DUMMY_PASSWORD_HASH;
+            // Returning null (never throwing) lets Fortify's AttemptToAuthenticate
+            // increment the login limiter and fire the Failed event.
             if (! Hash::check($password, $hash) || ! $user instanceof User) {
-                throw ValidationException::withMessages(['email' => __('auth.failed')]);
+                return null;
+            }
+
+            if (Hash::needsRehash($user->password)) {
+                $user->forceFill(['password' => Hash::make($password)])->save();
             }
 
             return $user;

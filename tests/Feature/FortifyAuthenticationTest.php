@@ -30,6 +30,33 @@ it('uses the same login failure for unknown email and wrong password', function 
     $wrong->assertSessionHasErrors(['email' => __('auth.failed')]);
 });
 
+it('fires the Failed event and increments the login limiter on failure', function (): void {
+    Illuminate\Support\Facades\Event::fake([Illuminate\Auth\Events\Failed::class]);
+    User::factory()->create(['email' => 'owner@example.test', 'password' => 'correct horse battery staple']);
+
+    $this->from('/login')->post('/login', ['email' => 'owner@example.test', 'password' => 'wrong'])
+        ->assertSessionHasErrors('email');
+
+    Illuminate\Support\Facades\Event::assertDispatched(Illuminate\Auth\Events\Failed::class);
+    expect(app(Laravel\Fortify\LoginRateLimiter::class)->attempts(request()->merge(['email' => 'owner@example.test'])))->toBeGreaterThan(0);
+});
+
+it('rehashes an outdated password hash on successful login', function (): void {
+    $user = User::factory()->create(['email' => 'owner@example.test']);
+    // Seed a hash whose cost differs from the configured rounds; the hashed
+    // cast refuses to store one directly, so write it past the cast.
+    User::query()->whereKey($user->id)->update(['password' => password_hash('correct horse battery staple', PASSWORD_BCRYPT, ['cost' => 5])]);
+    $stale = $user->refresh()->password;
+
+    $this->post('/login', ['email' => 'owner@example.test', 'password' => 'correct horse battery staple']);
+
+    $this->assertAuthenticatedAs($user);
+    $fresh = $user->refresh()->password;
+    expect($fresh)->not->toBe($stale)
+        ->and(Hash::needsRehash($fresh))->toBeFalse()
+        ->and(Hash::check('correct horse battery staple', $fresh))->toBeTrue();
+});
+
 it('canonicalizes password reset lookup and resets with confirmed rules', function (): void {
     Notification::fake();
     $user = User::factory()->create(['email' => 'owner@example.test']);
