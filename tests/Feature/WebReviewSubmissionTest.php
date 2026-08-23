@@ -55,6 +55,22 @@ it('retains uploaded bytes and client filename without reserializing', function 
         ->toBe(['spec' => $source, 'spec_ref' => 'petstore.yaml']);
 });
 
+it('rejects binary and unparseable submissions before dispatching work', function (): void {
+    Bus::fake();
+    [$user] = memberFixture();
+
+    $this->actingAs($user)->post('/app/reviews', [
+        'spec_file' => UploadedFile::fake()->createWithContent('spec.bin', "\xFF\xFE\x00\x01"),
+        'mode' => 'council', 'dimension' => 'domain-modeling',
+    ])->assertSessionHasErrors('spec_file');
+    $this->actingAs($user)->post('/app/reviews', [
+        'spec' => 'not a spec, just prose',
+        'mode' => 'council', 'dimension' => 'domain-modeling',
+    ])->assertSessionHasErrors('spec');
+    expect(Review::query()->count())->toBe(0);
+    Bus::assertNothingBatched();
+});
+
 it('rejects absent simultaneous and oversized sources', function (): void {
     [$user] = memberFixture();
 

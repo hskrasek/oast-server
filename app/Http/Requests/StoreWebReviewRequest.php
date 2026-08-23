@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Council\Dimension;
+use App\Rules\SpecDocument;
 use App\Council\ReviewMode;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -22,8 +23,8 @@ final class StoreWebReviewRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'spec' => ['nullable', 'string', 'required_without:spec_file', 'prohibits:spec_file'],
-            'spec_file' => ['nullable', 'file', 'max:5120', 'required_without:spec', 'prohibits:spec'],
+            'spec' => ['nullable', 'string', 'required_without:spec_file', 'prohibits:spec_file', new SpecDocument],
+            'spec_file' => ['nullable', 'file', 'max:5120', 'required_without:spec', 'prohibits:spec', new SpecDocument],
             'mode' => ['required', Rule::enum(ReviewMode::class)],
             'dimension' => ['required', Rule::enum(Dimension::class)],
         ];
