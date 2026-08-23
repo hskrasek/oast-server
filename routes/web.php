@@ -29,7 +29,17 @@ use App\Http\Controllers\TokenSettingsController;
 use App\Site\Og\OgTemplate;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/up', ReadinessController::class)->name('up');
+// Readiness must not depend on (or write) database-backed sessions: probe
+// requests would otherwise create a session row each time, and a broken
+// database could throw inside StartSession before the controller's own
+// catch block can report the 503.
+Route::get('/up', ReadinessController::class)->withoutMiddleware([
+    Illuminate\Cookie\Middleware\EncryptCookies::class,
+    Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+    Illuminate\Session\Middleware\StartSession::class,
+    Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    Illuminate\Foundation\Http\Middleware\PreventRequestForgery::class,
+])->name('up');
 
 Route::get('/', HomeController::class)->name('home');
 Route::view('/why', 'site.why')->name('why');

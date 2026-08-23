@@ -31,6 +31,11 @@ it('is not ready for pending migrations', function (): void {
     $this->getJson('/up')->assertServiceUnavailable()->assertExactJson(['status' => 'not ready']);
 });
 
+it('runs outside the session and cookie stack', function (): void {
+    $this->get('/up')->assertHeaderMissing('Set-Cookie');
+    expect(Illuminate\Support\Facades\DB::table('sessions')->count())->toBe(0);
+});
+
 it('does not expose database exceptions', function (): void {
     $migrator = Mockery::mock(Migrator::class);
     $migrator->shouldReceive('repositoryExists')->once()->andThrow(new RuntimeException('database down'));
