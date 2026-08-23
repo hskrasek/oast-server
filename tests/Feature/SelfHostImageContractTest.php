@@ -56,6 +56,34 @@ it('rejects missing malformed and explicit raw or base64 sentinel keys', functio
     'zero base64' => 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
 ]);
 
+it('rejects the placeholder and too-short bootstrap secrets', function (string $secret, string $message): void {
+    $process = new Process([base_path('docker/validate-bootstrap-secret')], base_path(), ['OAST_BOOTSTRAP_SECRET' => $secret]);
+    $process->run();
+
+    expect($process->getExitCode())->toBe(64)
+        ->and($process->getErrorOutput())->toContain($message);
+})->with([
+    'documented placeholder' => ['replace-with-a-high-entropy-secret', 'must not be the documented placeholder'],
+    'too short' => ['tiny-secret', 'must be at least 16 characters'],
+]);
+
+it('accepts a strong or absent bootstrap secret and discards mail by default', function (): void {
+    $strong = new Process([base_path('docker/validate-bootstrap-secret')], base_path(), ['OAST_BOOTSTRAP_SECRET' => 'a-genuinely-long-random-secret']);
+    $strong->run();
+    $absent = new Process([base_path('docker/validate-bootstrap-secret')], base_path(), ['OAST_BOOTSTRAP_SECRET' => '']);
+    $absent->run();
+
+    expect($strong->getExitCode())->toBe(0, $strong->getErrorOutput())
+        ->and($absent->getExitCode())->toBe(0, $absent->getErrorOutput())
+        ->and((string) file_get_contents(base_path('docker/entrypoint.sh')))->toContain('validate-bootstrap-secret')
+        // Mail defaults to the discarding array transport so invitation and
+        // reset bearer links never land in container logs.
+        ->and((string) file_get_contents(base_path('Dockerfile')))->toContain('validate-bootstrap-secret', 'MAIL_MAILER=array')
+        // Reset links are built from the forwarded Host, so the proxy example
+        // must pin it rather than reflect the client's request header.
+        ->and((string) file_get_contents(base_path('docker/README.md')))->toContain('proxy_set_header Host $server_name;');
+});
+
 it('accepts valid raw and base64 keys', function (string $key): void {
     $process = new Process([base_path('docker/validate-app-key')], base_path(), ['APP_KEY' => $key]);
     $process->run();

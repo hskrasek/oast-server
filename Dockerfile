@@ -23,8 +23,9 @@ COPY --from=assets /build/public/build /app/public/build
 COPY docker/supervisord.conf /etc/supervisor/conf.d/oast.conf
 COPY docker/entrypoint.sh /usr/local/bin/oast-entrypoint
 COPY docker/validate-app-key /usr/local/bin/validate-app-key
+COPY docker/validate-bootstrap-secret /usr/local/bin/validate-bootstrap-secret
 COPY docker/oast-worker-health /usr/local/bin/oast-worker-health
-RUN chmod 0755 /usr/local/bin/oast-entrypoint /usr/local/bin/validate-app-key /usr/local/bin/oast-worker-health \
+RUN chmod 0755 /usr/local/bin/oast-entrypoint /usr/local/bin/validate-app-key /usr/local/bin/validate-bootstrap-secret /usr/local/bin/oast-worker-health \
  && mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/views bootstrap/cache /var/lib/oast/publications \
  && chown -R www-data:www-data storage bootstrap/cache /var/lib/oast
 ENV APP_ENV=production \
@@ -39,6 +40,7 @@ ENV APP_ENV=production \
     SESSION_DRIVER=database \
     CACHE_STORE=database \
     QUEUE_CONNECTION=database \
+    MAIL_MAILER=array \
     SITE_PUBLICATIONS_PATH=/var/lib/oast/publications \
     OAST_QUEUE_WORKERS=1 \
     SERVER_NAME=:8080

@@ -10,7 +10,9 @@ docker run -d --name oast -p 127.0.0.1:8080:8080 \
   -v oast-data:/var/lib/oast oast-server:latest
 ```
 
-The strings `01234567890123456789012345678901`, `00000000000000000000000000000000`, `base64:MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=`, and `base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=` are rejected sentinels, not usable examples. A Docker secret may instead be mounted with `APP_KEY_FILE=/run/secrets/app_key`; trailing CR/LF is removed safely. Missing, malformed, and sentinel raw/base64 keys exit 64. Startup runs `php artisan migrate --force` before either supervised child starts; migration failure exits non-zero.
+The strings `01234567890123456789012345678901`, `00000000000000000000000000000000`, `base64:MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=`, and `base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=` are rejected sentinels, not usable examples. A Docker secret may instead be mounted with `APP_KEY_FILE=/run/secrets/app_key`; trailing CR/LF is removed safely. Missing, malformed, and sentinel raw/base64 keys exit 64. The bootstrap secret is validated the same way: the documented `replace-with-a-high-entropy-secret` placeholder and any value shorter than 16 characters exit 64 at startup. Startup runs `php artisan migrate --force` before either supervised child starts; migration failure exits non-zero.
+
+Outbound mail defaults to the discarding `array` transport: invitation and reset emails are not sent (and, deliberately, never written to container logs, which would leak their bearer links). Invitation links are always available to copy from the organization settings page, and `oast:user:password` resets passwords from the CLI. Configure real `MAIL_*` SMTP settings to deliver mail.
 
 `/var/lib/oast` contains `database.sqlite`, its WAL/SHM files, and `publications/`. Keep the volume across replacement containers. Database-backed queue, cache, and sessions are defaults. One queue listener is supported by default. `OAST_QUEUE_WORKERS=2` or greater enables more listeners but increases SQLite write contention.
 
@@ -18,14 +20,15 @@ The worker uses `--timeout=900`. Keep `DB_QUEUE_RETRY_AFTER=960` (or another val
 
 ## Reverse proxy and TLS
 
-Remote exposure requires TLS and secure cookies. Keep Docker published on `127.0.0.1`, put the TLS proxy on the host, and add `-e SESSION_SECURE_COOKIE=true` to the `docker run` command so the session cookie is never sent over plain HTTP. The application trusts its immediate proxy's forwarded headers, so the proxy **must overwrite** `X-Forwarded-For` with the connection address — passing a client-supplied value through lets remote clients spoof their IP and bypass the login, password-reset, and setup rate limits. Web spec uploads accept files up to 5 MiB, so raise Nginx's 1 MiB default body limit:
+Remote exposure requires TLS and secure cookies. Keep Docker published on `127.0.0.1`, put the TLS proxy on the host, and add `-e SESSION_SECURE_COOKIE=true` to the `docker run` command so the session cookie is never sent over plain HTTP. The application trusts its immediate proxy's forwarded headers, so the proxy **must overwrite** `X-Forwarded-For` with the connection address — passing a client-supplied value through lets remote clients spoof their IP and bypass the login, password-reset, and setup rate limits. The upstream `Host` **must be pinned** to the server block's canonical name, never reflected from the request: the application builds absolute URLs (including password-reset links in email) from the forwarded host, so `proxy_set_header Host $host;` would let an attacker poison reset links by sending an arbitrary `Host` header. Declare an exact `server_name`, forward `$server_name`, and give the listener a `default_server` catch-all that rejects unknown hosts (`return 444;`). Web spec uploads accept files up to 5 MiB, so raise Nginx's 1 MiB default body limit:
 
 ```nginx
+server_name oast.example.com;
 client_max_body_size 10m;
 
 location / {
     proxy_pass http://127.0.0.1:8080;
-    proxy_set_header Host $host;
+    proxy_set_header Host $server_name;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-For $remote_addr;
 }
@@ -33,7 +36,7 @@ location / {
 location /app/reviews/ {
     proxy_pass http://127.0.0.1:8080;
     proxy_http_version 1.1;
-    proxy_set_header Host $host;
+    proxy_set_header Host $server_name;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-For $remote_addr;
     proxy_buffering off;

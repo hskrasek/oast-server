@@ -11,6 +11,7 @@ if [ -z "${APP_KEY:-}" ] && [ -n "${APP_KEY_FILE:-}" ]; then
 fi
 
 /usr/local/bin/validate-app-key
+/usr/local/bin/validate-bootstrap-secret
 
 OAST_QUEUE_WORKERS="${OAST_QUEUE_WORKERS:-1}"
 export OAST_QUEUE_WORKERS
