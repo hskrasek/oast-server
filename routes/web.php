@@ -81,6 +81,7 @@ Route::get('/setup', [SetupController::class, 'show'])->name('setup.show');
 Route::post('/setup/authorize', SetupAuthorizationController::class)->middleware('throttle:5,1')->name('setup.authorize');
 Route::post('/setup', [SetupController::class, 'store'])->middleware('throttle:5,1')->name('setup.store');
 
+Route::get('/invitations/resume', [InvitationController::class, 'resume'])->middleware(['installation', 'throttle:30,1'])->name('invitations.resume');
 Route::get('/invitations/{token}', [InvitationController::class, 'show'])->where('token', '[a-f0-9]{64}')->middleware(['installation', 'throttle:30,1'])->name('invitations.show');
 Route::post('/invitations/{token}/login', [InvitationController::class, 'startLogin'])->where('token', '[a-f0-9]{64}')->middleware(['installation', 'throttle:10,1'])->name('invitations.start-login');
 Route::post('/invitations/{token}/register', [InvitationController::class, 'startRegistration'])->where('token', '[a-f0-9]{64}')->middleware(['installation', 'throttle:10,1'])->name('invitations.start-registration');

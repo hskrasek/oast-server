@@ -9,10 +9,16 @@ use App\Organizations\InvitationAcceptanceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Crypt;
 
 final readonly class InvitationController
 {
     public function __construct(private InvitationAcceptanceService $acceptance) {}
+
+    public static function unseal(mixed $sealed): ?string
+    {
+        return is_string($sealed) ? rescue(fn(): string => Crypt::decryptString($sealed), null, false) : null;
+    }
 
     public function show(string $token): Response
     {
@@ -28,8 +34,11 @@ final readonly class InvitationController
             return redirect()->route('invitations.show', $token);
         }
 
-        $request->session()->put('oast.invitation.token', $token);
-        $request->session()->put('url.intended', route('invitations.show', $token));
+        // Sessions are database-backed and unencrypted: only the sealed token
+        // may touch the sessions table, and url.intended goes through the
+        // token-less resume route instead of embedding the bearer URL.
+        $request->session()->put('oast.invitation.token', Crypt::encryptString($token));
+        $request->session()->put('url.intended', route('invitations.resume'));
         return redirect()->route('login');
     }
 
@@ -40,7 +49,14 @@ final readonly class InvitationController
             return redirect()->route('invitations.show', $token);
         }
 
-        $request->session()->put('oast.invitation.token', $token);
+        $request->session()->put('oast.invitation.token', Crypt::encryptString($token));
         return redirect()->route('register');
+    }
+
+    public function resume(Request $request): RedirectResponse
+    {
+        $token = self::unseal($request->session()->get('oast.invitation.token'));
+
+        return $token === null ? redirect()->route('home') : redirect()->route('invitations.show', $token);
     }
 }

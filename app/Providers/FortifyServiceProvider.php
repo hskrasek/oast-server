@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Actions\Identity\CreateNewUser;
+use App\Http\Controllers\InvitationController;
 use App\Actions\Identity\ResetUserPassword;
 use App\Actions\Identity\UpdateUserPassword;
 use App\Actions\Identity\UpdateUserProfileInformation;
@@ -32,7 +33,7 @@ final class FortifyServiceProvider extends ServiceProvider
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
         Fortify::registerView(fn(Request $request): \Illuminate\Contracts\View\Factory|\Illuminate\Contracts\View\View => view('auth.register', [
-            'token' => $request->session()->get('oast.invitation.token'),
+            'token' => InvitationController::unseal($request->session()->get('oast.invitation.token')),
         ]));
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         /** @var view-string $login */

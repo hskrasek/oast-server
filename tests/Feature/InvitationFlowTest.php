@@ -75,10 +75,12 @@ it('preserves an invitation through matching-email login and acceptance', functi
     $user = User::factory()->create(['email' => 'new@example.test']);
     $plain = basename(app(InvitationService::class)->createOrReplace($organization, $owner, $user->email)['url']);
     $this->post(route('invitations.start-login', $plain))->assertRedirect(route('login'));
-    expect(session('oast.invitation.token'))->toBe($plain)
-        ->and(session('url.intended'))->toBe(route('invitations.show', $plain));
+    expect(session('oast.invitation.token'))->not->toBe($plain)
+        ->and(App\Http\Controllers\InvitationController::unseal(session('oast.invitation.token')))->toBe($plain)
+        ->and(session('url.intended'))->toBe(route('invitations.resume'));
     $this->post(route('login'), ['email' => $user->email, 'password' => 'password'])
-        ->assertRedirect(route('invitations.show', $plain));
+        ->assertRedirect(route('invitations.resume'));
+    $this->get(route('invitations.resume'))->assertRedirect(route('invitations.show', $plain));
     $this->post(route('invitations.accept', $plain))->assertRedirect(route('app.home'));
     expect($user->memberships()->where('organization_id', $organization->id)->exists())->toBeTrue();
 });
@@ -89,7 +91,8 @@ it('returns to the invitation after login but rejects a mismatched email', funct
     $plain = basename(app(InvitationService::class)->createOrReplace($organization, $owner, 'new@example.test')['url']);
     $this->post(route('invitations.start-login', $plain));
     $this->post(route('login'), ['email' => $other->email, 'password' => 'password'])
-        ->assertRedirect(route('invitations.show', $plain));
+        ->assertRedirect(route('invitations.resume'));
+    $this->get(route('invitations.resume'))->assertRedirect(route('invitations.show', $plain));
     $this->post(route('invitations.accept', $plain))->assertSessionHasErrors('invitation');
     expect($other->memberships()->count())->toBe(0);
 });
@@ -99,12 +102,21 @@ it('posts an invitation token into encrypted session before register', function 
     $result = app(InvitationService::class)->createOrReplace($organization, $owner, 'new@example.test');
     $plain = basename($result['url']);
     $this->post(route('invitations.start-registration', $plain))->assertRedirect(route('register'));
-    expect(session('oast.invitation.token'))->toBe($plain);
+    expect(session('oast.invitation.token'))->not->toBe($plain)
+        ->and(App\Http\Controllers\InvitationController::unseal(session('oast.invitation.token')))->toBe($plain);
+    // The register page still renders the plaintext token into the form.
+    $this->get(route('register'))->assertOk()->assertSee($plain);
     // '_previous.url' is only ever populated by a prior GET (StartSession
     // only stores it for GET requests); this POST-only flow leaves it unset.
     // Cast to string so the guard (the token must never leak into it) still
     // holds without Pest's toContain() rejecting a null actual.
     expect((string) session()->get('_previous.url'))->not->toContain($plain . '?');
+});
+
+it('sends resume visitors without a usable sealed token to the homepage', function (): void {
+    $this->get(route('invitations.resume'))->assertRedirect(route('home'));
+    $this->withSession(['oast.invitation.token' => 'not-a-sealed-value'])
+        ->get(route('invitations.resume'))->assertRedirect(route('home'));
 });
 
 it('registers and consumes an invitation atomically', function (): void {
