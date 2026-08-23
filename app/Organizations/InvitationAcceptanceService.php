@@ -39,12 +39,17 @@ final class InvitationAcceptanceService
     public function registerAndAccept(OrganizationInvitation $invitation, RegistrationData $data): User
     {
         return DB::transaction(function () use ($invitation, $data): User {
-            if (! hash_equals($invitation->email, CanonicalEmail::from($data->email))) {
+            // Lock and validate the invitation BEFORE inserting the user: a
+            // racing registration that already consumed it must get the normal
+            // unavailable-invitation error, not a users.email unique-constraint
+            // exception from the insert.
+            $locked = OrganizationInvitation::query()->lockForUpdate()->findOrFail($invitation->id);
+            if (! $locked->available() || ! hash_equals($locked->email, CanonicalEmail::from($data->email))) {
                 throw ValidationException::withMessages(['invitation' => 'This invitation is not available.']);
             }
 
             $user = User::query()->create(['name' => $data->name, 'email' => CanonicalEmail::from($data->email), 'password' => Hash::make($data->password)]);
-            $this->accept($invitation, $user);
+            $this->accept($locked, $user);
             return $user;
         }, 3);
     }

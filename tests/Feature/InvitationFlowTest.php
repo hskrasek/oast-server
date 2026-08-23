@@ -23,6 +23,23 @@ it('redirects invitation continuations to setup before bootstrap', function (): 
     $this->post(route('invitations.accept', $token))->assertRedirect(route('setup.show'));
 });
 
+it('rejects a consumed invitation before inserting the invited user', function (): void {
+    [$owner, $organization] = memberFixture(role: 'owner');
+    $plain = basename(app(InvitationService::class)->createOrReplace($organization, $owner, 'new@example.test')['url']);
+    $service = app(App\Organizations\InvitationAcceptanceService::class);
+    $invitation = $service->find($plain);
+    assert($invitation instanceof OrganizationInvitation);
+    $data = new App\Identity\RegistrationData('New Member', 'new@example.test', 'correct horse battery staple');
+    $service->registerAndAccept($invitation, $data);
+    $registered = User::query()->count();
+
+    // A racing second registration must get the unavailable-invitation error,
+    // not a users.email unique-constraint exception from inserting first.
+    expect(fn() => $service->registerAndAccept($invitation, $data))
+        ->toThrow(Illuminate\Validation\ValidationException::class)
+        ->and(User::query()->count())->toBe($registered);
+});
+
 it('creates a canonical hashed invitation and keeps a copyable URL when mail fails', function (): void {
     Mail::shouldReceive('to')->once()->andThrow(new RuntimeException('mail down'));
     [$owner, $organization] = memberFixture(role: 'owner');
