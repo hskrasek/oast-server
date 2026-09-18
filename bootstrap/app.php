@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Council\Exceptions\DesignerException;
 use App\Council\Exceptions\JudgeException;
 use App\Council\Exceptions\PanelException;
 use App\Http\Problems\ProblemResponse;
@@ -76,6 +77,18 @@ return Application::configure(basePath: dirname(__DIR__))
             $problem['errors'] = $e->errors;
 
             return ProblemResponse::from($problem, 502);
+        });
+
+        $exceptions->render(function (DesignerException $e, Request $request) use ($onApi): ?Response {
+            if (! $onApi($request)) {
+                return null;
+            }
+
+            $problem = new ApiProblem('Designer produced an invalid spec', ProblemType::InvalidDesignerOutput->value)
+                ->setDetail($e->getMessage());
+            $problem['errors'] = $e->errors;
+
+            return ProblemResponse::from($problem, 422);
         });
 
         $exceptions->render(function (NotFoundHttpException $e, Request $request) use ($onApi): ?Response {
