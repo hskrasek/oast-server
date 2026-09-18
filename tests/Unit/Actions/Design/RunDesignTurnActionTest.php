@@ -8,7 +8,7 @@ use App\Council\Exceptions\DesignerException;
 
 const VALID_SPEC = "openapi: 3.1.0\ninfo:\n  title: Library\n  version: 0.1.0\n";
 
-function history(int $count): array
+function designHistory(int $count): array
 {
     return array_map(
         fn(int $i): array => ['role' => $i % 2 === 0 ? 'user' : 'assistant', 'content' => "m{$i}"],
@@ -64,7 +64,7 @@ it('rejects a parseable document without a top-level openapi key', function (): 
 it('truncates history to the last 20 messages before prompting', function (): void {
     Designer::fake([['spec' => VALID_SPEC, 'reply' => 'ok']]);
 
-    app(RunDesignTurnAction::class)(VALID_SPEC, 'x', history(25));
+    app(RunDesignTurnAction::class)(VALID_SPEC, 'x', designHistory(25));
 
     Designer::assertPrompted(fn(object $prompt): bool => ! str_contains($prompt->prompt, 'USER: m5') && str_contains($prompt->prompt, 'USER: m6'));
 });

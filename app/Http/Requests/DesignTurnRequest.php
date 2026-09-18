@@ -30,7 +30,7 @@ final class DesignTurnRequest extends FormRequest
             'message' => ['required', 'string', 'max:16384'],
             'history' => ['sometimes', 'array'],
             'history.*.role' => ['required', Rule::in(['user', 'assistant'])],
-            'history.*.content' => ['required', 'string'],
+            'history.*.content' => ['required', 'string', 'max:16384'],
         ];
     }
 

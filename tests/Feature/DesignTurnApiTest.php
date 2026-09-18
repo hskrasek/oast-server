@@ -81,3 +81,27 @@ it('rejects a history entry with an unknown role', function (): void {
         // Assert on the exact key directly instead.
         ->assertJsonPath('errors', fn($errors) => filled($errors['history.0.role'][0] ?? null));
 });
+
+it('rejects a history entry whose content is over 16 KB', function (): void {
+    $this->postJson("https://{$this->apiHost()}/design/turns", [
+        'spec' => DRAFT,
+        'message' => 'x',
+        'history' => [['role' => 'user', 'content' => str_repeat('a', 16385)]],
+    ])
+        ->assertStatus(422)
+        ->assertJsonPath('type', ProblemType::Validation->value)
+        ->assertJsonPath('errors', fn(array $errors): bool => filled($errors['history.0.content'][0] ?? null));
+});
+
+it('retries once over HTTP and returns the second draft', function (): void {
+    Designer::fake([
+        ['spec' => 'info: [unclosed', 'reply' => 'first'],
+        ['spec' => DRAFT, 'reply' => 'second'],
+    ]);
+
+    $this->postJson("https://{$this->apiHost()}/design/turns", ['spec' => DRAFT, 'message' => 'add books'])
+        ->assertOk()
+        ->assertJsonPath('reply', 'second');
+
+    Designer::assertPrompted(fn(object $prompt): bool => str_contains($prompt->prompt, 'Your previous spec did not parse'));
+});
