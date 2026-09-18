@@ -24,6 +24,9 @@ return [
     // Dedicated strong judge — never a panelist.
     'judge' => 'anthropic/claude-opus-4.8',
 
+    // Single strong drafting model for design mode; null => the judge slug.
+    'designer' => env('OAST_DESIGNER'),
+
     // Baseline single model; null => first panelist.
     'baseline' => null,
 
