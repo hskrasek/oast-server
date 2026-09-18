@@ -51,6 +51,13 @@ it('rejects a missing message', function (): void {
         ->assertJsonPath('errors.message.0', fn($msg) => filled($msg));
 });
 
+it('rejects a missing spec key', function (): void {
+    $this->postJson("https://{$this->apiHost()}/design/turns", ['message' => 'x'])
+        ->assertStatus(422)
+        ->assertJsonPath('type', ProblemType::Validation->value)
+        ->assertJsonPath('errors.spec.0', fn($msg) => filled($msg));
+});
+
 it('rejects a spec over 1 MB', function (): void {
     $this->postJson("https://{$this->apiHost()}/design/turns", [
         'spec' => str_repeat('a', 1048577),

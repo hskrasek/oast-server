@@ -49,9 +49,13 @@ final class DesignTurnRequest extends FormRequest
      * The global ConvertEmptyStringsToNull middleware turns an empty `spec`
      * (turn one, no draft yet) into null before validation runs; put it back
      * so `present`/`string` see the empty string the client actually sent.
+     * Only when the key was sent at all — a wholly missing `spec` must stay
+     * missing so `present` still rejects it.
      */
     protected function prepareForValidation(): void
     {
-        $this->merge(['spec' => $this->input('spec') ?? '']);
+        if ($this->has('spec')) {
+            $this->merge(['spec' => $this->input('spec') ?? '']);
+        }
     }
 }
