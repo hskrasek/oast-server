@@ -31,3 +31,6 @@ Thumbs.db
 
 # local git worktrees
 /.worktrees/
+
+# dagr run files (herdr pane scratch)
+.dagr/
