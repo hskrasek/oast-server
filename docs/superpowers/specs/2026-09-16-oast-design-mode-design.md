@@ -220,7 +220,9 @@ one "fix the blockers" turn. This is the dogfood run and the definition of done.
 ## Deferred, with the trigger to un-defer
 
 - **Streaming replies**: when 30-second silent waits annoy the author. The SSE plumbing
-  from M1 is reusable.
+  from M1 is reusable. Related ceiling: a turn is up to two calls of `oast.timeout`
+  (240 s at the default), which exceeds cloudflared's 100 s edge timeout on the hosted
+  path. Lower the designer's timeout, or stream, once a real turn hits it.
 - **Patch-based edits**: when whole-spec rewrites become slow or lossy on large files.
   Greenfield files are small; this is an M5+ editor concern.
 - **Server-side sessions**: when the web client needs design mode. That is the M3/M5
