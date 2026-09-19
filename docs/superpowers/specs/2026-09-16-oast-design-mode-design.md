@@ -150,8 +150,10 @@ oast design <spec> [--server URL]
 
 Line-oriented REPL on stdin/stdout, prompt `› `. Each iteration:
 
-1. Re-read the spec file from disk and record its mtime.
-2. Read one line. Empty line: loop. `/quit` or EOF: exit 0.
+1. Read one line. Empty line: loop. `/quit` or EOF: exit 0.
+2. Re-read the spec file from disk and record its mtime. (After the line, not before:
+   a hand edit made while idle at the prompt is then picked up instead of tripping the
+   clobber guard.)
 3. `/roast`: run the existing `roast` code path on the file, print findings as today,
    then append one assistant-role message to the session containing the findings
    summary (title, severity, location per finding) so the next prose turn can act on
