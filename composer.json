@@ -86,7 +86,7 @@
             "pint --parallel",
             "bun run lint"
         ],
-        "test:type-coverage": "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --exclude-group=live",
+        "test:type-coverage": "__PEST_PLUGIN_ENV=1 php -d variables_order=EGPCS -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --exclude-group=live",
         "test:lint": [
             "pint --parallel --test",
             "rector --dry-run",
