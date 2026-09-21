@@ -10,12 +10,13 @@
     "license": "AGPL-3.0-only",
     "require": {
         "php": "^8.5",
-        "aws/aws-sdk-php": "^3.387",
+        "aws/aws-sdk-php": "^3.387.2",
         "crell/api-problem": "^3.8",
         "laravel/ai": "^0.8.1",
         "laravel/framework": "^13.16.1",
         "laravel/tinker": "^3.0.2",
-        "nunomaduro/essentials": "^1.2"
+        "nunomaduro/essentials": "^1.2",
+        "symfony/yaml": "^8.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.24.1",
@@ -85,7 +86,7 @@
             "pint --parallel",
             "bun run lint"
         ],
-        "test:type-coverage": "@php -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --exclude-group=live",
+        "test:type-coverage": "__PEST_PLUGIN_ENV=1 php -d variables_order=EGPCS -d memory_limit=1G vendor/bin/pest --type-coverage --min=100 --exclude-group=live",
         "test:lint": [
             "pint --parallel --test",
             "rector --dry-run",

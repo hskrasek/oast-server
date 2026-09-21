@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\DesignTurnController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\ReviewEventsController;
 use App\Http\Controllers\ShowReviewController;
@@ -12,4 +13,5 @@ Route::domain(config()->string('oast.api_domain'))->middleware(EnsureApiEnabled:
     Route::post('/reviews', [ReviewController::class, 'store']);
     Route::get('/reviews/{review}', ShowReviewController::class)->name('api.reviews.show');
     Route::get('/reviews/{review}/events', ReviewEventsController::class)->name('api.reviews.events');
+    Route::post('/design/turns', DesignTurnController::class)->name('api.design.turns');
 });

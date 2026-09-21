@@ -6,6 +6,8 @@ namespace App\Http\Problems;
 
 enum ProblemType: string
 {
+    case InvalidDesignerOutput = 'https://oast.sh/problems/designer-output-invalid';
+
     case InvalidJudgeOutput = 'https://oast.sh/problems/judge-output-invalid';
 
     case NotFound = 'https://oast.sh/problems/not-found';
